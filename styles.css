@@ -29,6 +29,7 @@ a { color: inherit; text-decoration: none; }
 svg { display: block; width: 1.35rem; height: 1.35rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 .launch-screen { position: fixed; z-index: 80; inset: 0; display: grid; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 42%, rgba(172,157,255,0.3), transparent 11rem), radial-gradient(circle at 50% 120%, rgba(255,178,129,0.24), transparent 19rem), #12111a; opacity: 1; pointer-events: all; transition: opacity 220ms ease, visibility 220ms ease; animation: launch-failsafe 1ms linear 2.2s forwards; }
+.launch-screen[hidden] { display: none !important; }
 .launch-screen::before, .launch-screen::after { content: ""; position: absolute; border: 1px solid rgba(255,255,255,0.09); border-radius: 50%; }
 .launch-screen::before { width: min(112vw, 44rem); aspect-ratio: 1; }
 .launch-screen::after { width: min(68vw, 25rem); aspect-ratio: 1; border-color: rgba(255,255,255,0.06); }
