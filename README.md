@@ -1,6 +1,6 @@
 # Sonora
 
-Sonora is an installable, offline-first personal music player. It plays audio files that you own or are allowed to use, and it can also stream a small catalog of Creative Commons or public-domain music directly from Internet Archive Netlabels.
+Sonora is an installable, offline-first personal music player. It plays audio files that you own or are allowed to use, and it can also stream openly licensed music from Internet Archive Netlabels and Hindi/Hindustani recordings from Wikimedia Commons.
 
 ## Use it on your phone
 
@@ -15,7 +15,7 @@ Sonora is an installable, offline-first personal music player. It plays audio fi
 - Play, pause, seek, skip, shuffle, repeat, favorite tracks, search, and make playlists.
 - Persist the library and imported audio locally with IndexedDB.
 - Use supported lock-screen/headphone controls through the Media Session API.
-- Search open, streamable music from Internet Archive Netlabels. Catalog tracks stay online, show their source/license context, and are not copied into your library.
+- Search open, streamable music from Internet Archive Netlabels and the Hindi & Hindustani shelf from Wikimedia Commons. Catalog tracks stay online, show their source/license context, and are not copied into your library.
 
 ## Important
 
@@ -23,4 +23,4 @@ Your music is stored in the browser on that device. Clearing the browser's site 
 
 ## Open music catalog
 
-The catalog uses Internet Archive's public search and metadata endpoints to find Creative Commons or public-domain audio from its Netlabels collection. Sonora streams the original file from Internet Archive; it does not download, rehost, or claim ownership of catalog audio. Availability, attribution, and license terms remain with the source item, which you can open from each result.
+The general catalog uses Internet Archive's public search and metadata endpoints to find Creative Commons or public-domain audio from its Netlabels collection. The Hindi & Hindustani shelf uses Wikimedia Commons' public API to find openly licensed Hindi-language songs, Hindustani classical music, folk recordings, and Songs of India. Sonora streams original files from their source; it does not download, rehost, or claim ownership of catalog audio. Availability, attribution, license terms, and phone-browser format support remain with each source item.
