@@ -28,6 +28,29 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 a { color: inherit; text-decoration: none; }
 svg { display: block; width: 1.35rem; height: 1.35rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
+.launch-screen { position: fixed; z-index: 80; inset: 0; display: grid; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 42%, rgba(172,157,255,0.3), transparent 11rem), radial-gradient(circle at 50% 120%, rgba(255,178,129,0.24), transparent 19rem), #12111a; opacity: 1; pointer-events: all; transition: opacity 220ms ease, visibility 220ms ease; animation: launch-failsafe 1ms linear 2.2s forwards; }
+.launch-screen::before, .launch-screen::after { content: ""; position: absolute; border: 1px solid rgba(255,255,255,0.09); border-radius: 50%; }
+.launch-screen::before { width: min(112vw, 44rem); aspect-ratio: 1; }
+.launch-screen::after { width: min(68vw, 25rem); aspect-ratio: 1; border-color: rgba(255,255,255,0.06); }
+.launch-screen.is-leaving { visibility: hidden; opacity: 0; pointer-events: none; animation: none; }
+.launch-stage { display: grid; place-items: center; position: relative; z-index: 1; width: 12rem; height: 13.4rem; text-align: center; }
+.launch-orbit { position: absolute; border: 1px solid rgba(255,255,255,0.14); border-radius: 50%; animation: launch-orbit 1.6s ease-out both; }
+.launch-orbit--outer { width: 10.5rem; aspect-ratio: 1; border-right-color: rgba(255,178,129,0.52); border-bottom-color: rgba(169,155,255,0.52); }
+.launch-orbit--inner { width: 7.3rem; aspect-ratio: 1; border-left-color: rgba(255,255,255,0.25); animation-delay: 110ms; }
+.launch-mark { display: inline-flex; align-items: center; justify-content: center; gap: 4px; position: relative; z-index: 1; width: 4.65rem; height: 4.65rem; padding: 0.8rem; color: #1c1827; background: linear-gradient(145deg, #c9c0ff, #a18ffe); border: 1px solid rgba(255,255,255,0.45); border-radius: 1.45rem 1.45rem 0.55rem; box-shadow: 0 18px 36px rgba(91,74,201,0.34), inset 0 1px rgba(255,255,255,0.5); transform: rotate(-7deg); animation: launch-mark 720ms cubic-bezier(.16,.8,.24,1) both; }
+.launch-mark i { display: block; width: 5px; background: currentColor; border-radius: 999px; }
+.launch-mark i:nth-child(1) { height: 1.15rem; }.launch-mark i:nth-child(2) { height: 2.15rem; }.launch-mark i:nth-child(3) { height: 1.58rem; }
+.launch-wave { display: flex; align-items: end; justify-content: center; gap: 0.24rem; position: absolute; top: 6.55rem; height: 1.45rem; }
+.launch-wave i { display: block; width: 0.21rem; height: 34%; background: var(--peach-bright); border-radius: 999px; box-shadow: 0 0 0.5rem rgba(255,178,129,0.34); animation: launch-wave 620ms ease-in-out infinite alternate; }
+.launch-wave i:nth-child(2) { height: 78%; animation-delay: 80ms; }.launch-wave i:nth-child(3) { height: 100%; animation-delay: 140ms; }.launch-wave i:nth-child(4) { height: 62%; animation-delay: 210ms; }.launch-wave i:nth-child(5) { height: 42%; animation-delay: 270ms; }
+.launch-stage p { position: absolute; top: 8.1rem; margin: 0; color: var(--ink); font-size: 1.6rem; font-weight: 800; letter-spacing: -0.06em; animation: launch-copy 520ms 260ms both; }
+.launch-stage small { position: absolute; top: 10.08rem; color: rgba(255,255,255,0.58); font-size: 0.61rem; font-weight: 750; letter-spacing: 0.17em; text-transform: uppercase; animation: launch-copy 520ms 340ms both; }
+@keyframes launch-mark { from { opacity: 0; transform: translateY(0.8rem) scale(0.62) rotate(-18deg); } to { opacity: 1; transform: translateY(0) scale(1) rotate(-7deg); } }
+@keyframes launch-orbit { from { opacity: 0; transform: scale(0.62) rotate(-30deg); } to { opacity: 1; transform: scale(1) rotate(0); } }
+@keyframes launch-copy { from { opacity: 0; transform: translateY(0.45rem); } to { opacity: 1; transform: translateY(0); } }
+@keyframes launch-wave { from { transform: scaleY(0.45); opacity: 0.5; } to { transform: scaleY(1.12); opacity: 1; } }
+@keyframes launch-failsafe { to { visibility: hidden; opacity: 0; pointer-events: none; } }
+
 .app-shell { position: relative; width: min(100%, 760px); min-height: 100svh; margin: 0 auto; padding: max(1rem, env(safe-area-inset-top)) 1.1rem calc(8.25rem + env(safe-area-inset-bottom)); }
 .topbar { display: flex; align-items: center; justify-content: space-between; height: 3.15rem; margin-bottom: 1.15rem; }
 .topbar-actions { display: flex; align-items: center; gap: 0.15rem; }
@@ -332,5 +355,6 @@ svg { display: block; width: 1.35rem; height: 1.35rem; fill: none; stroke: curre
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .launch-screen, .launch-orbit, .launch-mark, .launch-wave i, .launch-stage p, .launch-stage small { animation: none; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
