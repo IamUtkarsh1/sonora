@@ -35,6 +35,8 @@ const miniArtist = $("#mini-artist");
 const miniArt = $("#mini-art");
 const miniProgress = $("#mini-progress-fill");
 const miniTogglePath = $("#mini-toggle-path");
+const miniToggle = $("#mini-toggle");
+const danceBuddy = $("#dance-buddy");
 const playlistDialog = $("#playlist-dialog");
 const playlistForm = $("#playlist-form");
 const playlistName = $("#playlist-name");
@@ -325,12 +327,27 @@ function homeMarkup() {
   return `<section class="view" aria-labelledby="home-title">
     <div class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">Your offline soundtrack</p>
+        <p class="eyebrow">Your music space</p>
         <h1 id="home-title">Music that stays yours.</h1>
         <p>${hasMusic ? "Your personal library is ready whenever you are — even when your signal is not." : "Add your own music for offline listening, or discover openly licensed tracks to stream online."}</p>
-        <div class="hero-actions"><button class="button" data-action="open-import" type="button">${addIcon()} Add music</button><button class="button button--ghost" data-action="open-catalog" type="button">Browse open music</button><button class="button button--ghost" data-action="open-hindi-catalog" type="button">Hindi music</button><button class="button button--ghost" data-action="open-live-radio" type="button">Live Hindi radio</button></div>
+        <div class="hero-actions"><button class="button hero-primary" data-action="open-live-radio" type="button">${playIcon()} Play live Hindi radio</button><button class="button button--ghost hero-secondary" data-action="open-import" type="button">${addIcon()} Add from phone</button></div>
+        <p class="hero-caption"><span></span>Live stations, open music, and the songs you own.</p>
+      </div>
+      <div class="hero-visual" aria-hidden="true">
+        <span class="hero-visual-label">PLAY</span>
+        <span class="hero-disc"><i></i><b>♫</b></span>
+        <span class="hero-wave"><i></i><i></i><i></i><i></i><i></i><i></i></span>
       </div>
     </div>
+
+    <section class="section listen-section" aria-labelledby="listen-title">
+      <div class="section-header listen-section-header"><div><p class="eyebrow">Ways to listen</p><h2 class="section-title" id="listen-title">Find your next sound.</h2></div></div>
+      <div class="listen-grid">
+        <button class="listen-card listen-card--radio" data-action="open-live-radio" type="button"><span class="listen-card-art">♫</span><span class="listen-card-copy"><span class="live-pill"><i></i> Live now</span><strong>Hindi radio</strong><small>Tap into live Bollywood and Hindi stations.</small></span><span class="listen-card-arrow" aria-hidden="true">↗</span></button>
+        <button class="listen-card listen-card--hindi" data-action="open-hindi-catalog" type="button"><span class="listen-card-art">♪</span><span class="listen-card-copy"><span class="listen-card-label">Open recordings</span><strong>Hindi classics</strong><small>Explore licensed Hindustani music.</small></span><span class="listen-card-arrow" aria-hidden="true">↗</span></button>
+        <button class="listen-card listen-card--catalog" data-action="open-catalog" type="button"><span class="listen-card-art">◌</span><span class="listen-card-copy"><span class="listen-card-label">Creative Commons</span><strong>Open music</strong><small>Discover free music across every mood.</small></span><span class="listen-card-arrow" aria-hidden="true">↗</span></button>
+      </div>
+    </section>
 
     ${hasMusic ? `<section class="section" aria-label="Your collections">
       <div class="quick-grid">
@@ -353,10 +370,9 @@ function homeMarkup() {
         <div class="stat-card"><strong>${favorites.length}</strong><span>favorites</span></div>
         <div class="stat-card"><strong>${totalMinutes || "—"}</strong><span>${totalMinutes ? "minutes offline" : "playtime"}</span></div>
       </div>
-    </section>` : `<section class="section">
-      <div class="empty-state"><div><span class="empty-icon">♫</span><h2>Your music will appear here</h2><p>Choose audio files from your phone or computer. They are stored in this browser, so you can keep listening offline.</p><button class="button" data-action="open-import" type="button">${addIcon()} Import your first song</button></div></div>
+    </section>` : `<section class="section library-start" aria-labelledby="library-start-title">
+      <span class="library-start-art" aria-hidden="true"><b>♫</b></span><div class="library-start-copy"><p class="eyebrow">Your library</p><h2 id="library-start-title">Bring the music you own.</h2><p>Import songs from your phone or computer. They stay available here when you are offline.</p></div><button class="button button--small" data-action="open-import" type="button">${addIcon()} Add songs</button>
     </section>`}
-    <section class="section catalog-callout"><div><p class="eyebrow">Listen online</p><h2 class="section-title">Explore free music and live radio</h2><p>Search Creative Commons and public-domain audio from Internet Archive Netlabels, open Hindi/Hindustani recordings from Wikimedia Commons, or tune into live Hindi radio.</p></div><div class="catalog-callout-actions"><button class="button button--small" data-action="open-catalog" type="button">Open catalog</button><button class="button button--small button--ghost" data-action="open-hindi-catalog" type="button">Hindi music</button><button class="button button--small button--ghost" data-action="open-live-radio" type="button">Live radio</button></div></section>
   </section>`;
 }
 
@@ -375,11 +391,13 @@ function searchMarkup() {
       <input id="search-input" class="search-input" value="${escapeHtml(query)}" autocomplete="off" placeholder="${radioMode ? "Station, city, genre, or Bollywood" : hindiMode ? "Hindi title, artist, raga, or folk song" : catalogMode ? "Artist, song, genre, or mood" : "Songs, artists, playlists"}" />
       <button class="search-submit" type="submit" aria-label="${radioMode ? "Search live radio" : catalogSearch ? "Search open music" : "Search your library"}">${searchIcon()}</button>
     </form>
-    <div class="filter-row" aria-label="Search filter">
+    <div class="source-switch" aria-label="Music source">
       <button class="chip ${!appState.searchType || appState.searchType === "all" ? "is-active" : ""}" data-action="set-search-type" data-type="all" type="button">Your library</button>
       <button class="chip ${catalogMode ? "is-active" : ""}" data-action="set-search-type" data-type="catalog" type="button">Open catalog</button>
       <button class="chip ${hindiMode ? "is-active" : ""}" data-action="set-search-type" data-type="hindi" type="button">Hindi & Hindustani</button>
       <button class="chip ${radioMode ? "is-active" : ""}" data-action="set-search-type" data-type="radio" type="button">Live Hindi radio</button>
+    </div>
+    <div class="collection-filter" aria-label="Library collection">
       <button class="chip ${appState.searchType === "favorites" ? "is-active" : ""}" data-action="set-search-type" data-type="favorites" type="button">Favorites</button>
       <button class="chip ${appState.searchType === "playlists" ? "is-active" : ""}" data-action="set-search-type" data-type="playlists" type="button">Playlists</button>
     </div>
@@ -426,7 +444,11 @@ function catalogResultsMarkup() {
   const attribution = mode === "radio"
     ? " Stations provide their own broadcasts; availability and rights are managed by each broadcaster. This is live radio, not an on-demand song catalog."
     : " Creator and license details stay with every result.";
-  return `<section class="section"><div class="section-header"><h2 class="section-title">${escapeHtml(source.title)}</h2><span class="text-link">${currentState.tracks.length} ${resultLabel}</span></div><p class="catalog-note">${escapeHtml(source.note)} <a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.name)}</a>.${attribution}${supportNote}</p>${needsRefresh ? `<p class="catalog-refresh">Tap search to update these results.</p>` : ""}${songRows(currentState.tracks, { queue: currentState.tracks.map((track) => track.id) })}</section>`;
+  const resultMeta = mode === "radio"
+    ? `<span class="result-count"><span class="live-pill live-pill--compact"><i></i> Live</span>${currentState.tracks.length} stations</span>`
+    : `<span class="result-count">${currentState.tracks.length} ${resultLabel}</span>`;
+  const radioHint = mode === "radio" ? `<p class="catalog-helper">Tap a station to begin a live broadcast.</p>` : "";
+  return `<section class="section catalog-results"><div class="section-header"><div><h2 class="section-title">${escapeHtml(source.title)}</h2>${radioHint}</div>${resultMeta}</div><p class="catalog-note">${escapeHtml(source.note)} <a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.name)}</a>.${attribution}${supportNote}</p>${needsRefresh ? `<p class="catalog-refresh">Tap search to update these results.</p>` : ""}${songRows(currentState.tracks, { queue: currentState.tracks.map((track) => track.id) })}</section>`;
 }
 
 function cleanCatalogQuery(value) {
@@ -1197,19 +1219,37 @@ function cycleRepeat() {
   showToast(player.repeat === "off" ? "Repeat off." : player.repeat === "all" ? "Repeat queue." : "Repeat this song.");
 }
 
+function updateDanceBuddy() {
+  const dancing = Boolean(player.currentId && isPlaying());
+  danceBuddy.hidden = !dancing;
+  danceBuddy.classList.toggle("is-dancing", dancing);
+  if (!dancing) {
+    danceBuddy.removeAttribute("data-step");
+    return;
+  }
+  const timing = Number.isFinite(audio.currentTime) && audio.currentTime > 0 ? audio.currentTime : Date.now() / 1000;
+  danceBuddy.dataset.step = String(Math.floor(timing * 3.5) % 4);
+}
+
 function updatePlayerUI() {
   const track = trackById(player.currentId);
   miniPlayer.hidden = !track;
-  if (!track) return;
+  if (!track) {
+    updateDanceBuddy();
+    return;
+  }
   const [a, b] = colorFor(track);
   miniArt.style.setProperty("--a", a);
   miniArt.style.setProperty("--b", b);
   miniTitle.textContent = track.title;
   miniArtist.textContent = track.artist || "Your music";
-  miniTogglePath.setAttribute("d", isPlaying() ? "M8 5h3v14H8zM13 5h3v14h-3z" : "M8 5v14l11-7z");
+  const playing = isPlaying();
+  miniTogglePath.setAttribute("d", playing ? "M8 5h3v14H8zM13 5h3v14h-3z" : "M8 5v14l11-7z");
+  miniToggle.setAttribute("aria-label", playing ? "Pause" : "Play");
   const duration = audio.duration || track.duration || 0;
   const progress = duration ? Math.min(100, Math.max(0, audio.currentTime / duration * 100)) : 0;
   miniProgress.style.width = `${progress}%`;
+  updateDanceBuddy();
   if (nowPlayingDialog.open) updateNowPlayingProgress();
 }
 
@@ -1227,6 +1267,7 @@ function renderNowPlaying() {
   const sourceDetails = isCatalogTrack
     ? `<a class="catalog-now-source" href="${escapeHtml(track.licenseUrl || track.sourcePage)}" target="_blank" rel="noreferrer">${escapeHtml(track.licenseLabel || "Open license")} · ${escapeHtml(sourceName)}</a>`
     : "";
+  const nowStatus = isLiveStation ? `<span class="now-live"><i></i> Live station</span>` : "";
   const favoriteControl = isCatalogTrack
     ? ""
     : `<button class="icon-button heart-button ${track.loved ? "is-loved" : ""}" data-action="toggle-like" data-id="${track.id}" type="button" aria-label="${track.loved ? "Remove from favorites" : "Add to favorites"}">${heartIcon(track.loved)}</button>`;
@@ -1241,7 +1282,7 @@ function renderNowPlaying() {
   </div>
   <span id="now-art" class="cover-art cover-art--large" style="--a:${a};--b:${b}"><b>♫</b></span>
   <div class="now-info">
-    <div><h1 id="now-playing-title">${escapeHtml(track.title)}</h1><p>${escapeHtml(track.artist || "Your music")}</p>${sourceDetails}</div>
+    <div>${nowStatus}<h1 id="now-playing-title">${escapeHtml(track.title)}</h1><p>${escapeHtml(track.artist || "Your music")}</p>${sourceDetails}</div>
     ${favoriteControl}
   </div>
   ${timingControls}
