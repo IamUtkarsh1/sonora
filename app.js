@@ -688,6 +688,8 @@ function radioStationToTrack(station) {
 
   const name = plainText(station?.name || "");
   if (!name) return null;
+  const hindiOrBollywood = [name, station?.tags, station?.language].join(" ").toLocaleLowerCase();
+  if (!/(hindi|bollywood|desi)/.test(hindiOrBollywood)) return null;
   const stationId = String(station?.stationuuid || `${name}-${streamUrl}`);
   const location = [station?.country, station?.state, station?.language]
     .map((value) => plainText(value))
