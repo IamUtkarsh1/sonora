@@ -28,6 +28,7 @@ const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const audio = $("#audio");
 const content = $("#app-content");
+const launchScreen = $("#launch-screen");
 const filePicker = $("#file-picker");
 const miniPlayer = $("#mini-player");
 const miniTitle = $("#mini-title");
@@ -1577,6 +1578,23 @@ function renderNowPlayingIfOpen() {
   if (nowPlayingDialog.open) renderNowPlaying();
 }
 
+function finishLaunchScreen() {
+  if (!launchScreen) return;
+  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  let hasSeenLaunch = false;
+  try {
+    hasSeenLaunch = sessionStorage.getItem("sonora-launch-seen") === "true";
+    sessionStorage.setItem("sonora-launch-seen", "true");
+  } catch { /* Keep the visual intro when session storage is unavailable. */ }
+  const delay = reducedMotion || hasSeenLaunch ? 70 : 760;
+  window.requestAnimationFrame(() => {
+    window.setTimeout(() => {
+      launchScreen.classList.add("is-leaving");
+      window.setTimeout(() => launchScreen.remove(), reducedMotion ? 40 : 280);
+    }, delay);
+  });
+}
+
 window.addEventListener("hashchange", () => {
   closeOpenMenus();
   render();
@@ -1602,3 +1620,4 @@ window.addEventListener("appinstalled", () => {
 installMediaSessionHandlers();
 syncInstallButton();
 render();
+finishLaunchScreen();
