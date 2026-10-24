@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#17151f" />
+    <meta name="description" content="Sonora is an offline-first personal music player for music you own." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Sonora" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="stylesheet" href="styles.css" />
+    <title>Sonora — your music, offline</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#home" aria-label="Sonora home">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>Sonora</span>
+        </a>
+        <div class="topbar-actions">
+          <button class="install-button" id="open-install" type="button">Install</button>
+          <button class="icon-button" id="open-import-top" type="button" aria-label="Add music">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          </button>
+        </div>
+      </header>
+
+      <main id="app-content" tabindex="-1"></main>
+
+      <section class="mini-player" id="mini-player" aria-label="Music player" hidden>
+        <button class="mini-art" id="open-now-playing" type="button" aria-label="Open now playing">
+          <span class="cover-art cover-art--small" id="mini-art"><b>♫</b></span>
+        </button>
+        <button class="mini-copy" id="open-now-playing-copy" type="button" aria-label="Open now playing">
+          <span id="mini-title">Nothing playing</span>
+          <small id="mini-artist">Choose a song from your library</small>
+        </button>
+        <button class="icon-button mini-toggle" id="mini-toggle" type="button" aria-label="Play">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path id="mini-toggle-path" d="M8 5v14l11-7z" /></svg>
+        </button>
+        <div class="mini-progress"><i id="mini-progress-fill"></i></div>
+      </section>
+
+      <nav class="bottom-nav" aria-label="Primary">
+        <a class="nav-link" data-view="home" href="#home">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z" /></svg>
+          <span>Home</span>
+        </a>
+        <a class="nav-link" data-view="search" href="#search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.75" cy="10.75" r="6.75" /><path d="m16 16 4.5 4.5" /></svg>
+          <span>Search</span>
+        </a>
+        <a class="nav-link" data-view="library" href="#library">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M8 9h8M8 13h8M8 17h4" /></svg>
+          <span>Library</span>
+        </a>
+      </nav>
+    </div>
+
+    <input id="file-picker" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac" multiple hidden />
+
+    <dialog class="dialog" id="playlist-dialog" aria-labelledby="playlist-dialog-title">
+      <form id="playlist-form" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">New collection</p>
+            <h2 id="playlist-dialog-title">Make a playlist</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog aria-label="Close">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+        <label class="field-label" for="playlist-name">Playlist name</label>
+        <input class="text-input" id="playlist-name" name="name" maxlength="48" autocomplete="off" placeholder="Late night drives" required />
+        <div class="dialog-actions">
+          <button class="button button--ghost" type="button" data-close-dialog>Cancel</button>
+          <button class="button" type="submit">Create playlist</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="dialog dialog--sheet" id="add-to-playlist-dialog" aria-labelledby="add-dialog-title">
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow">Organize</p>
+          <h2 id="add-dialog-title">Add to playlist</h2>
+        </div>
+        <button class="icon-button" type="button" data-close-dialog aria-label="Close">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+        </button>
+      </div>
+      <div id="playlist-picker" class="playlist-picker"></div>
+    </dialog>
+
+    <dialog class="dialog" id="install-dialog" aria-labelledby="install-dialog-title">
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow">Put Sonora on your home screen</p>
+          <h2 id="install-dialog-title">Install Sonora</h2>
+        </div>
+        <button class="icon-button" type="button" data-close-dialog aria-label="Close">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+        </button>
+      </div>
+      <div class="install-instructions" id="install-instructions"></div>
+    </dialog>
+
+    <dialog class="dialog now-playing-dialog" id="now-playing-dialog" aria-labelledby="now-playing-title">
+      <section class="now-playing" id="now-playing-content"></section>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <audio id="audio" preload="metadata"></audio>
+    <script src="app.js" defer></script>
+  </body>
+</html>
