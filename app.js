@@ -1,9 +1,11 @@
-/* Sonora is intentionally a personal, local-first music player. */
+/* Sonora is a local-first music player with a small, openly licensed streaming catalog. */
 
 const DB_NAME = "sonora-audio";
 const DB_VERSION = 1;
 const AUDIO_STORE = "audio-files";
 const META_KEY = "sonora-library-v1";
+const ARCHIVE_SEARCH_URL = "https://archive.org/advancedsearch.php";
+const ARCHIVE_METADATA_URL = "https://archive.org/metadata/";
 const COLORS = [
   ["#7967e9", "#f3a26e"],
   ["#4e88cb", "#8be0c1"],
@@ -41,6 +43,10 @@ let toastTimer = null;
 let currentObjectUrl = null;
 let dbPromise = null;
 let deferredInstallPrompt = null;
+let catalogRequestController = null;
+let catalogRequestId = 0;
+let catalogState = { status: "idle", query: "", tracks: [], error: "" };
+let catalogTrackCache = new Map();
 let appState = loadState();
 let player = {
   currentId: null,
@@ -132,7 +138,9 @@ function escapeHtml(value) {
 }
 
 function trackById(id) {
-  return appState.tracks.find((track) => track.id === id);
+  return appState.tracks.find((track) => track.id === id)
+    || catalogState.tracks.find((track) => track.id === id)
+    || catalogTrackCache.get(id);
 }
 
 function playlistById(id) {
@@ -201,6 +209,14 @@ function moreIcon() {
   return `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1" fill="currentColor" /><circle cx="12" cy="12" r="1" fill="currentColor" /><circle cx="12" cy="19" r="1" fill="currentColor" /></svg>`;
 }
 
+function externalIcon() {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8" /><path d="M17 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h5" /></svg>`;
+}
+
+function searchIcon() {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.75" cy="10.75" r="6.75" /><path d="m16 16 4.5 4.5" /></svg>`;
+}
+
 function songRows(tracks, options = {}) {
   const { emptyMessage = "No music here yet.", queue = tracks.map((track) => track.id) } = options;
   if (!tracks.length) {
@@ -210,22 +226,30 @@ function songRows(tracks, options = {}) {
   return `<div class="song-list">${tracks.map((track, index) => {
     const current = isCurrent(track);
     const playing = current && isPlaying();
+    const isCatalogTrack = Boolean(track.streamUrl);
+    const secondary = isCatalogTrack
+      ? `${escapeHtml(track.artist || "Open music")} · ${escapeHtml(track.licenseLabel || "Open license")}`
+      : escapeHtml(track.artist || "Unknown artist");
+    const actions = isCatalogTrack
+      ? `<a class="icon-button more-button song-action source-link" href="${escapeHtml(track.sourcePage)}" target="_blank" rel="noreferrer" aria-label="View ${escapeHtml(track.title)} on Internet Archive">${externalIcon()}</a>`
+      : `<div class="song-menu">
+          <button class="icon-button more-button song-action" data-action="toggle-menu" type="button" aria-label="More options for ${escapeHtml(track.title)}">${moreIcon()}</button>
+          <div class="song-actions" role="menu">
+            <button data-action="toggle-like" data-id="${track.id}" type="button" role="menuitem">${track.loved ? "Remove from favorites" : "Add to favorites"}</button>
+            <button data-action="add-to-playlist" data-id="${track.id}" type="button" role="menuitem">Add to playlist</button>
+            <button data-action="delete-track" data-id="${track.id}" type="button" role="menuitem">Remove from device</button>
+          </div>
+        </div>`;
     return `<article class="song-row ${current ? "is-current" : ""}" data-song-id="${track.id}">
       <button class="song-play" data-action="play-track" data-id="${track.id}" data-queue="${queueAttribute}" type="button" aria-label="${playing ? "Pause" : "Play"} ${escapeHtml(track.title)}">
         ${playing ? pauseIcon() : artMarkup(track, "cover-art--small")}
       </button>
       <button class="song-copy" data-action="play-track" data-id="${track.id}" data-queue="${queueAttribute}" type="button">
         <span class="song-title">${escapeHtml(track.title)}</span>
-        <span class="song-artist">${escapeHtml(track.artist || "Unknown artist")}</span>
+        <span class="song-artist">${secondary}</span>
+        ${isCatalogTrack ? `<span class="song-source">Internet Archive · streaming online</span>` : ""}
       </button>
-      <div class="song-menu">
-        <button class="icon-button more-button song-action" data-action="toggle-menu" type="button" aria-label="More options for ${escapeHtml(track.title)}">${moreIcon()}</button>
-        <div class="song-actions" role="menu">
-          <button data-action="toggle-like" data-id="${track.id}" type="button" role="menuitem">${track.loved ? "Remove from favorites" : "Add to favorites"}</button>
-          <button data-action="add-to-playlist" data-id="${track.id}" type="button" role="menuitem">Add to playlist</button>
-          <button data-action="delete-track" data-id="${track.id}" type="button" role="menuitem">Remove from device</button>
-        </div>
-      </div>
+      ${actions}
     </article>`;
   }).join("")}</div>`;
 }
@@ -242,8 +266,8 @@ function homeMarkup() {
       <div class="hero-copy">
         <p class="eyebrow">Your offline soundtrack</p>
         <h1 id="home-title">Music that stays yours.</h1>
-        <p>${hasMusic ? "Your personal library is ready whenever you are — even when your signal is not." : "Add music you own or are allowed to use. Sonora keeps it private and ready to play offline."}</p>
-        <button class="button" data-action="open-import" type="button">${addIcon()} Add music</button>
+        <p>${hasMusic ? "Your personal library is ready whenever you are — even when your signal is not." : "Add your own music for offline listening, or discover openly licensed tracks to stream online."}</p>
+        <div class="hero-actions"><button class="button" data-action="open-import" type="button">${addIcon()} Add music</button><button class="button button--ghost" data-action="open-catalog" type="button">Browse open music</button></div>
       </div>
     </div>
 
@@ -271,25 +295,29 @@ function homeMarkup() {
     </section>` : `<section class="section">
       <div class="empty-state"><div><span class="empty-icon">♫</span><h2>Your music will appear here</h2><p>Choose audio files from your phone or computer. They are stored in this browser, so you can keep listening offline.</p><button class="button" data-action="open-import" type="button">${addIcon()} Import your first song</button></div></div>
     </section>`}
+    <section class="section catalog-callout"><div><p class="eyebrow">Listen online</p><h2 class="section-title">Explore free, open music</h2><p>Search Creative Commons and public-domain audio from Internet Archive, then stream it without adding files to your phone.</p></div><button class="button button--small" data-action="open-catalog" type="button">Open catalog</button></section>
   </section>`;
 }
 
 function searchMarkup() {
   const query = appState.searchQuery || "";
+  const catalogMode = appState.searchType === "catalog";
   const results = filteredTracks(query);
   return `<section class="view" aria-labelledby="search-title">
-    <p class="eyebrow">Find your sound</p>
-    <h1 class="page-title" id="search-title">Search your library</h1>
-    <label class="search-box" for="search-input">
+    <p class="eyebrow">${catalogMode ? "Internet Archive open music" : "Find your sound"}</p>
+    <h1 class="page-title" id="search-title">${catalogMode ? "Search open music" : "Search your library"}</h1>
+    <form class="search-box" id="music-search-form" role="search">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.75" cy="10.75" r="6.75" /><path d="m16 16 4.5 4.5" /></svg>
-      <input id="search-input" class="search-input" value="${escapeHtml(query)}" autocomplete="off" placeholder="Songs, artists, playlists" />
-    </label>
+      <input id="search-input" class="search-input" value="${escapeHtml(query)}" autocomplete="off" placeholder="${catalogMode ? "Artist, song, genre, or mood" : "Songs, artists, playlists"}" />
+      <button class="search-submit" type="submit" aria-label="${catalogMode ? "Search open music" : "Search your library"}">${searchIcon()}</button>
+    </form>
     <div class="filter-row" aria-label="Search filter">
-      <button class="chip ${!appState.searchType || appState.searchType === "all" ? "is-active" : ""}" data-action="set-search-type" data-type="all" type="button">All</button>
+      <button class="chip ${!appState.searchType || appState.searchType === "all" ? "is-active" : ""}" data-action="set-search-type" data-type="all" type="button">Your library</button>
+      <button class="chip ${catalogMode ? "is-active" : ""}" data-action="set-search-type" data-type="catalog" type="button">Open catalog</button>
       <button class="chip ${appState.searchType === "favorites" ? "is-active" : ""}" data-action="set-search-type" data-type="favorites" type="button">Favorites</button>
       <button class="chip ${appState.searchType === "playlists" ? "is-active" : ""}" data-action="set-search-type" data-type="playlists" type="button">Playlists</button>
     </div>
-    <div id="search-results">${searchResultsMarkup(results, query)}</div>
+    <div id="search-results">${catalogMode ? catalogResultsMarkup() : searchResultsMarkup(results, query)}</div>
   </section>`;
 }
 
@@ -310,6 +338,143 @@ function searchResultsMarkup(results, query) {
   if (!appState.tracks.length) return `<div class="empty-state"><div><span class="empty-icon">⌕</span><h2>Nothing to search yet</h2><p>Import a few tracks, then find them by song title or artist.</p><button class="button button--small" data-action="open-import" type="button">${addIcon()} Add music</button></div></div>`;
   if (!results.length) return `<div class="empty-state"><div><span class="empty-icon">⌕</span><h2>No matches yet</h2><p>Try another title, artist, or playlist.</p></div></div>`;
   return `<section class="section"><div class="section-header"><h2 class="section-title">${query ? `${results.length} result${results.length === 1 ? "" : "s"}` : "All songs"}</h2></div>${songRows(results, { queue: results.map((track) => track.id) })}</section>`;
+}
+
+function catalogResultsMarkup() {
+  const typedQuery = (appState.searchQuery || "").trim();
+  if (catalogState.status === "loading") {
+    return `<div class="empty-state"><div><span class="empty-icon">♫</span><h2>Finding open music</h2><p>Checking the Internet Archive catalog for openly licensed tracks that can stream here.</p></div></div>`;
+  }
+  if (catalogState.status === "error") {
+    return `<div class="empty-state"><div><span class="empty-icon">!</span><h2>Catalog unavailable right now</h2><p>${escapeHtml(catalogState.error)}</p><button class="button button--small" data-action="refresh-catalog" type="button">Try again</button></div></div>`;
+  }
+  if (!catalogState.tracks.length) {
+    return `<div class="empty-state"><div><span class="empty-icon">♫</span><h2>Free music, ready to stream</h2><p>Search openly licensed Creative Commons and public-domain music from Internet Archive. Nothing is copied into your library unless you add your own file.</p><button class="button button--small" data-action="catalog-quick-query" data-query="ambient" type="button">Try ambient music</button></div></div>`;
+  }
+  const needsRefresh = catalogState.query !== typedQuery;
+  return `<section class="section"><div class="section-header"><h2 class="section-title">Open catalog</h2><span class="text-link">${catalogState.tracks.length} streams</span></div><p class="catalog-note">Streaming Creative Commons/public-domain audio from <a href="https://archive.org/" target="_blank" rel="noreferrer">Internet Archive</a>. Creator and license details stay with every result.</p>${needsRefresh ? `<p class="catalog-refresh">Tap search to update these results.</p>` : ""}${songRows(catalogState.tracks, { queue: catalogState.tracks.map((track) => track.id) })}</section>`;
+}
+
+function cleanCatalogQuery(value) {
+  return String(value || "")
+    .replace(/[^a-zA-Z0-9\s-]/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
+function archiveCatalogQuery(query) {
+  const clauses = [
+    "mediatype:audio",
+    "collection:opensource_audio",
+    "subject:music",
+    "(licenseurl:*creativecommons.org* OR licenseurl:*publicdomain*)",
+    'format:"VBR MP3"'
+  ];
+  const terms = cleanCatalogQuery(query);
+  if (terms.length) clauses.push(`(${terms.join(" AND ")})`);
+  return clauses.join(" AND ");
+}
+
+function archiveAudioScore(file) {
+  const name = String(file?.name || "");
+  if (!/\.(mp3|ogg|opus|m4a|aac|wav|flac)$/i.test(name) || file?.private === "true") return -1;
+  const format = String(file?.format || "").toLowerCase();
+  let score = 1;
+  if (format.includes("vbr mp3")) score += 90;
+  else if (format === "mp3" || format.includes("mp3")) score += 80;
+  else if (format.includes("ogg") || format.includes("opus")) score += 70;
+  else if (format.includes("aac") || format.includes("m4a")) score += 60;
+  else if (format.includes("wav") || format.includes("flac")) score += 50;
+  if (file.source === "derivative") score += 4;
+  return score;
+}
+
+function playableArchiveFile(files) {
+  return [...files]
+    .map((file) => ({ file, score: archiveAudioScore(file) }))
+    .filter((candidate) => candidate.score >= 0)
+    .sort((a, b) => b.score - a.score)[0]?.file || null;
+}
+
+function hashValue(value) {
+  let hash = 0;
+  for (const character of String(value)) hash = (hash * 31 + character.charCodeAt(0)) | 0;
+  return Math.abs(hash);
+}
+
+function archiveFilePath(fileName) {
+  return String(fileName).split("/").map((part) => encodeURIComponent(part)).join("/");
+}
+
+function archiveTrackId(identifier, fileName) {
+  return `archive-${encodeURIComponent(identifier).replace(/%/g, "_")}-${encodeURIComponent(fileName).replace(/%/g, "_")}`;
+}
+
+function openLicenseLabel(url) {
+  return /publicdomain/i.test(String(url || "")) ? "Public domain" : "Creative Commons";
+}
+
+async function archiveDocumentToTrack(document, index, signal) {
+  const identifier = String(document.identifier || "");
+  if (!identifier) return null;
+  const response = await fetch(`${ARCHIVE_METADATA_URL}${encodeURIComponent(identifier)}`, { signal });
+  if (!response.ok) return null;
+  const item = await response.json();
+  const file = playableArchiveFile(item.files || []);
+  if (!file) return null;
+  const metadata = item.metadata || {};
+  const licenseUrl = metadata.licenseurl || document.licenseurl || "";
+  const fileName = String(file.name || "");
+  return {
+    id: archiveTrackId(identifier, `${index}-${fileName}`),
+    title: metadata.title || document.title || fileName.replace(/\.[^/.]+$/, "") || "Untitled open track",
+    artist: metadata.creator || document.creator || "Internet Archive creator",
+    album: metadata.collection || "Open music catalog",
+    duration: Number(file.length || file.duration || 0),
+    color: hashValue(`${identifier}/${fileName}`),
+    streamUrl: `https://archive.org/download/${encodeURIComponent(identifier)}/${archiveFilePath(fileName)}`,
+    sourcePage: `https://archive.org/details/${encodeURIComponent(identifier)}`,
+    licenseLabel: openLicenseLabel(licenseUrl),
+    licenseUrl
+  };
+}
+
+async function searchOpenCatalog(query) {
+  const normalizedQuery = String(query || "").trim();
+  catalogRequestController?.abort();
+  const requestId = ++catalogRequestId;
+  const controller = new AbortController();
+  catalogRequestController = controller;
+  catalogState = { status: "loading", query: normalizedQuery, tracks: catalogState.tracks, error: "" };
+  renderSearchResults();
+
+  try {
+    const params = new URLSearchParams({ q: archiveCatalogQuery(normalizedQuery), rows: "16", page: "1", output: "json" });
+    ["identifier", "title", "creator", "licenseurl"].forEach((field) => params.append("fl[]", field));
+    const response = await fetch(`${ARCHIVE_SEARCH_URL}?${params.toString()}`, { signal: controller.signal });
+    if (!response.ok) throw new Error("The open music catalog did not respond.");
+    const payload = await response.json();
+    const documents = payload?.response?.docs || [];
+    const candidates = await Promise.allSettled(documents.slice(0, 12).map((document, index) => archiveDocumentToTrack(document, index, controller.signal)));
+    if (requestId !== catalogRequestId) return;
+    const tracks = candidates
+      .filter((candidate) => candidate.status === "fulfilled" && candidate.value)
+      .map((candidate) => candidate.value)
+      .slice(0, 8);
+    tracks.forEach((track) => catalogTrackCache.set(track.id, track));
+    catalogState = { status: "ready", query: normalizedQuery, tracks, error: "" };
+  } catch (error) {
+    if (error.name === "AbortError" || requestId !== catalogRequestId) return;
+    console.error(error);
+    catalogState = { status: "error", query: normalizedQuery, tracks: [], error: "Check your connection, then search the catalog again." };
+  } finally {
+    if (requestId === catalogRequestId) {
+      catalogRequestController = null;
+      renderSearchResults();
+    }
+  }
 }
 
 function libraryMarkup() {
@@ -383,7 +548,10 @@ function render() {
 
 function renderSearchResults() {
   const target = $("#search-results");
-  if (target) target.innerHTML = searchResultsMarkup(filteredTracks(appState.searchQuery || ""), appState.searchQuery || "");
+  if (!target) return;
+  target.innerHTML = appState.searchType === "catalog"
+    ? catalogResultsMarkup()
+    : searchResultsMarkup(filteredTracks(appState.searchQuery || ""), appState.searchQuery || "");
 }
 
 function showToast(message) {
@@ -526,18 +694,26 @@ async function playTrack(id, requestedQueue = []) {
   }
 
   try {
-    const blob = await getAudioFile(id);
-    if (!blob) throw new Error("The audio file is no longer on this device.");
+    let source;
+    if (track.streamUrl) {
+      source = track.streamUrl;
+    } else {
+      const blob = await getAudioFile(id);
+      if (!blob) throw new Error("The audio file is no longer on this device.");
+      source = URL.createObjectURL(blob);
+    }
     if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
-    currentObjectUrl = URL.createObjectURL(blob);
+    currentObjectUrl = track.streamUrl ? null : source;
     player.currentId = id;
     player.queue = uniqueIds(requestedQueue.length ? requestedQueue : appState.tracks.map((item) => item.id));
     if (!player.queue.includes(id)) player.queue.unshift(id);
-    audio.src = currentObjectUrl;
+    audio.src = source;
     audio.currentTime = 0;
-    track.lastPlayedAt = Date.now();
-    track.plays = (track.plays || 0) + 1;
-    saveState();
+    if (!track.streamUrl) {
+      track.lastPlayedAt = Date.now();
+      track.plays = (track.plays || 0) + 1;
+      saveState();
+    }
     await audio.play();
     updateMediaSession(track);
     render();
@@ -732,15 +908,25 @@ function renderNowPlaying() {
   if (!track) return;
   const queue = currentQueue().map(trackById).filter(Boolean);
   const [a, b] = colorFor(track);
+  const isCatalogTrack = Boolean(track.streamUrl);
+  const topAction = isCatalogTrack
+    ? `<a class="icon-button" href="${escapeHtml(track.sourcePage)}" target="_blank" rel="noreferrer" aria-label="View source on Internet Archive">${externalIcon()}</a>`
+    : `<button class="icon-button" data-action="add-to-playlist" data-id="${track.id}" type="button" aria-label="Add to playlist">${addIcon()}</button>`;
+  const sourceDetails = isCatalogTrack
+    ? `<a class="catalog-now-source" href="${escapeHtml(track.licenseUrl || track.sourcePage)}" target="_blank" rel="noreferrer">${escapeHtml(track.licenseLabel || "Open license")} · Internet Archive</a>`
+    : "";
+  const favoriteControl = isCatalogTrack
+    ? ""
+    : `<button class="icon-button heart-button ${track.loved ? "is-loved" : ""}" data-action="toggle-like" data-id="${track.id}" type="button" aria-label="${track.loved ? "Remove from favorites" : "Add to favorites"}">${heartIcon(track.loved)}</button>`;
   nowPlayingContent.innerHTML = `<div class="now-top">
     <button class="icon-button" data-action="close-now-playing" type="button" aria-label="Close now playing"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></button>
     <p>Now playing</p>
-    <button class="icon-button" data-action="add-to-playlist" data-id="${track.id}" type="button" aria-label="Add to playlist">${addIcon()}</button>
+    ${topAction}
   </div>
   <span id="now-art" class="cover-art cover-art--large" style="--a:${a};--b:${b}"><b>♫</b></span>
   <div class="now-info">
-    <div><h1 id="now-playing-title">${escapeHtml(track.title)}</h1><p>${escapeHtml(track.artist || "Your music")}</p></div>
-    <button class="icon-button heart-button ${track.loved ? "is-loved" : ""}" data-action="toggle-like" data-id="${track.id}" type="button" aria-label="${track.loved ? "Remove from favorites" : "Add to favorites"}">${heartIcon(track.loved)}</button>
+    <div><h1 id="now-playing-title">${escapeHtml(track.title)}</h1><p>${escapeHtml(track.artist || "Your music")}</p>${sourceDetails}</div>
+    ${favoriteControl}
   </div>
   <input id="now-scrubber" class="scrubber" type="range" min="0" max="100" value="0" step="0.1" aria-label="Song position" />
   <div class="time-row"><span id="now-current-time">0:00</span><span id="now-duration">${durationText(audio.duration || track.duration)}</span></div>
@@ -844,6 +1030,25 @@ async function handleAction(action, button) {
       appState.searchType = button.dataset.type;
       render();
       $("#search-input")?.focus();
+      if (appState.searchType === "catalog") await searchOpenCatalog(appState.searchQuery || "");
+      break;
+    case "open-catalog":
+      appState.searchType = "catalog";
+      window.location.hash = "search";
+      render();
+      $("#search-input")?.focus();
+      await searchOpenCatalog(appState.searchQuery || "");
+      break;
+    case "catalog-quick-query":
+      appState.searchType = "catalog";
+      appState.searchQuery = button.dataset.query || "";
+      window.location.hash = "search";
+      render();
+      $("#search-input")?.focus();
+      await searchOpenCatalog(appState.searchQuery);
+      break;
+    case "refresh-catalog":
+      await searchOpenCatalog(appState.searchQuery || catalogState.query || "");
       break;
     case "set-library-filter":
       appState.libraryFilter = button.dataset.filter;
@@ -916,6 +1121,16 @@ document.addEventListener("click", async (event) => {
     return;
   }
   if (!event.target.closest(".song-menu")) closeOpenMenus();
+});
+
+document.addEventListener("submit", async (event) => {
+  if (event.target.id !== "music-search-form") return;
+  event.preventDefault();
+  if (appState.searchType === "catalog") {
+    await searchOpenCatalog(appState.searchQuery || "");
+  } else {
+    renderSearchResults();
+  }
 });
 
 document.addEventListener("input", (event) => {
