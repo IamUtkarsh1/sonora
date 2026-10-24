@@ -62,6 +62,7 @@ svg { display: block; width: 1.35rem; height: 1.35rem; fill: none; stroke: curre
 .button svg { width: 1.08rem; height: 1.08rem; }
 .button--ghost { color: var(--ink); background: rgba(255,255,255,0.09); }
 .button--small { min-height: 2.35rem; padding: 0.5rem 0.85rem; font-size: 0.82rem; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
 
 .quick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
 .quick-card { display: flex; align-items: center; gap: 0.75rem; min-width: 0; padding: 0; overflow: hidden; color: var(--ink); text-align: left; background: var(--surface); border: 1px solid transparent; border-radius: 0.78rem; }
@@ -87,8 +88,10 @@ svg { display: block; width: 1.35rem; height: 1.35rem; fill: none; stroke: curre
 .song-copy { min-width: 0; text-align: left; background: none; border: 0; }
 .song-title { display: block; overflow: hidden; font-size: 0.91rem; font-weight: 690; text-overflow: ellipsis; white-space: nowrap; }
 .song-artist { display: block; overflow: hidden; margin-top: 0.2rem; color: var(--muted); font-size: 0.78rem; text-overflow: ellipsis; white-space: nowrap; }
+.song-source { display: block; overflow: hidden; margin-top: 0.14rem; color: var(--purple-strong); font-size: 0.66rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .song-action { color: var(--muted); }
 .song-action:hover { color: var(--peach); }
+.source-link { color: var(--purple-strong); }
 .song-menu { position: relative; }
 .more-button { width: 2.55rem; height: 2.55rem; }
 .more-button svg { width: 1.05rem; height: 1.05rem; }
@@ -114,10 +117,18 @@ svg { display: block; width: 1.35rem; height: 1.35rem; fill: none; stroke: curre
 .search-box svg { width: 1.15rem; color: var(--muted); }
 .search-input { width: 100%; min-height: 3.15rem; color: var(--ink); background: transparent; border: 0; outline: 0; font-size: 0.93rem; }
 .search-input::placeholder { color: var(--quiet); }
+.search-submit { display: grid; place-items: center; flex: 0 0 auto; width: 2.5rem; height: 2.5rem; padding: 0; color: var(--purple-strong); background: transparent; border: 0; border-radius: 0.65rem; }
+.search-submit:hover { background: rgba(255,255,255,0.08); }
+.search-submit svg { width: 1.08rem; }
 .filter-row { display: flex; gap: 0.5rem; margin: 0.9rem 0 1.15rem; overflow-x: auto; scrollbar-width: none; }
 .filter-row::-webkit-scrollbar { display: none; }
 .chip { flex: 0 0 auto; padding: 0.48rem 0.75rem; color: var(--muted); background: rgba(255,255,255,0.06); border: 1px solid transparent; border-radius: 999px; font-size: 0.79rem; font-weight: 650; }
 .chip:hover, .chip.is-active { color: #1c1823; background: var(--peach); }
+.catalog-callout { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.1rem; background: rgba(154,140,255,0.09); border: 1px solid rgba(154,140,255,0.22); border-radius: 1rem; }
+.catalog-callout p:not(.eyebrow) { max-width: 32rem; margin: 0.45rem 0 0; color: var(--muted); font-size: 0.85rem; line-height: 1.45; }
+.catalog-callout .button { flex: 0 0 auto; }
+.catalog-note, .catalog-refresh { margin: 0 0 0.85rem; color: var(--muted); font-size: 0.8rem; line-height: 1.45; }
+.catalog-note a, .catalog-refresh, .catalog-now-source { color: var(--purple-strong); }
 
 .library-header { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
 .library-header .button { flex: 0 0 auto; }
@@ -175,6 +186,7 @@ svg { display: block; width: 1.35rem; height: 1.35rem; fill: none; stroke: curre
 .now-info { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .now-info h1 { max-width: 72%; margin: 0; overflow: hidden; font-size: clamp(1.35rem, 6vw, 1.8rem); letter-spacing: -0.045em; text-overflow: ellipsis; white-space: nowrap; }
 .now-info p { max-width: 72%; margin: 0.33rem 0 0; overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
+.catalog-now-source { display: inline-block; margin-top: 0.5rem; font-size: 0.75rem; }
 .heart-button.is-loved { color: var(--peach); }
 .scrubber { width: 100%; margin-top: 1.7rem; accent-color: var(--peach); }
 .time-row { display: flex; justify-content: space-between; margin-top: 0.3rem; color: var(--muted); font-size: 0.72rem; }
@@ -206,6 +218,7 @@ svg { display: block; width: 1.35rem; height: 1.35rem; fill: none; stroke: curre
   .quick-card > span:last-child { font-size: 0.77rem; }
   .stat-card { padding: 0.72rem; }
   .install-button { padding-right: 0.58rem; padding-left: 0.58rem; }
+  .catalog-callout { align-items: flex-start; flex-direction: column; }
 }
 
 @media (prefers-reduced-motion: reduce) {
