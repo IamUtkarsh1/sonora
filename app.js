@@ -15,6 +15,45 @@ const HINDI_COMMONS_CATEGORIES = [
   { title: "Category:Songs of India", label: "Songs of India" }
 ];
 const HINDI_RADIO_TAGS = ["bollywood", "hindi"];
+const RADIO_DIRECTORY_MODES = {
+  radio: {
+    title: "Live Hindi radio",
+    emptyHeading: "Live Hindi radio, ready to play",
+    emptyCopy: "Browse public Hindi and Bollywood radio stations. Each station plays a continuous live broadcast, not a song-on-demand catalog.",
+    loadingCopy: "Finding currently available Hindi and Bollywood radio stations.",
+    quickLabel: "Find live stations",
+    searchPlaceholder: "Station, city, genre, or Bollywood",
+    tags: HINDI_RADIO_TAGS,
+    tagExact: true,
+    fallbackArtist: "Live Hindi radio",
+    collectionLabel: "Live Hindi radio"
+  },
+  "india-news": {
+    title: "India news radio",
+    emptyHeading: "India news, live on radio",
+    emptyCopy: "Browse public Indian news stations. Each station plays a continuous live broadcast, not a news-on-demand service.",
+    loadingCopy: "Finding currently available Indian news stations.",
+    quickLabel: "Find India news",
+    searchPlaceholder: "Station, city, language, or topic",
+    tags: ["news"],
+    tagExact: false,
+    countryCode: "IN",
+    fallbackArtist: "India news radio",
+    collectionLabel: "India news"
+  },
+  "world-news": {
+    title: "World news radio",
+    emptyHeading: "World news, live on radio",
+    emptyCopy: "Browse public international news stations. Each station plays a continuous live broadcast, not a news-on-demand service.",
+    loadingCopy: "Finding currently available world news stations.",
+    quickLabel: "Find world news",
+    searchPlaceholder: "Station, country, language, or topic",
+    tags: ["news"],
+    tagExact: false,
+    fallbackArtist: "World news radio",
+    collectionLabel: "World news"
+  }
+};
 const COLORS = [
   ["#7967e9", "#f3a26e"],
   ["#4e88cb", "#8be0c1"],
@@ -60,7 +99,7 @@ let catalogRequestId = 0;
 let catalogState = { status: "idle", query: "", tracks: [], error: "", mode: "catalog" };
 let catalogTrackCache = new Map();
 let hindiCommonsTracks = null;
-let hindiRadioStations = null;
+let radioStationsByMode = {};
 let appState = loadState();
 let player = {
   currentId: null,
@@ -158,7 +197,11 @@ function trackById(id) {
 }
 
 function isCatalogSearch(type = appState.searchType) {
-  return type === "catalog" || type === "hindi" || type === "radio";
+  return type === "catalog" || type === "hindi" || isRadioMode(type);
+}
+
+function isRadioMode(mode = appState.searchType) {
+  return Object.prototype.hasOwnProperty.call(RADIO_DIRECTORY_MODES, mode);
 }
 
 function activeCatalogMode() {
@@ -179,17 +222,19 @@ function catalogSourceInfo(mode = activeCatalogMode()) {
       quickLabel: "Show Hindi recordings"
     };
   }
-  if (mode === "radio") {
+  const radioDirectory = RADIO_DIRECTORY_MODES[mode];
+  if (radioDirectory) {
     return {
       name: "Radio Browser",
-      title: "Live Hindi radio",
-      emptyHeading: "Live Hindi radio, ready to play",
-      emptyCopy: "Browse public Hindi and Bollywood radio stations. Each station plays a continuous live broadcast, not a song-on-demand catalog.",
-      loadingCopy: "Finding currently available Hindi and Bollywood radio stations.",
+      title: radioDirectory.title,
+      emptyHeading: radioDirectory.emptyHeading,
+      emptyCopy: radioDirectory.emptyCopy,
+      loadingCopy: radioDirectory.loadingCopy,
       note: "Listening to public live-station streams listed by",
       url: RADIO_BROWSER_SITE_URL,
       quickAction: "refresh-radio",
-      quickLabel: "Find live stations"
+      quickLabel: radioDirectory.quickLabel,
+      searchPlaceholder: radioDirectory.searchPlaceholder
     };
   }
   return {
@@ -350,6 +395,14 @@ function homeMarkup() {
       </div>
     </section>
 
+    <section class="section news-listen-section" aria-labelledby="news-radio-title">
+      <div class="section-header listen-section-header"><div><p class="eyebrow">News radio</p><h2 class="section-title" id="news-radio-title">Stay informed, live.</h2></div></div>
+      <div class="listen-grid news-listen-grid">
+        <button class="listen-card listen-card--india-news" data-action="open-india-news" type="button"><span class="listen-card-art" aria-hidden="true">IN</span><span class="listen-card-copy"><span class="live-pill"><i></i> Live news</span><strong>India news</strong><small>Public Indian news stations, live.</small></span><span class="listen-card-arrow" aria-hidden="true">↗</span></button>
+        <button class="listen-card listen-card--world-news" data-action="open-world-news" type="button"><span class="listen-card-art" aria-hidden="true">◎</span><span class="listen-card-copy"><span class="live-pill"><i></i> Live news</span><strong>World news</strong><small>International news stations, live.</small></span><span class="listen-card-arrow" aria-hidden="true">↗</span></button>
+      </div>
+    </section>
+
     ${hasMusic ? `<section class="section" aria-label="Your collections">
       <div class="quick-grid">
         <button class="quick-card" data-action="show-library-filter" data-filter="favorites" type="button">
@@ -381,22 +434,27 @@ function searchMarkup() {
   const query = appState.searchQuery || "";
   const catalogMode = appState.searchType === "catalog";
   const hindiMode = appState.searchType === "hindi";
-  const radioMode = appState.searchType === "radio";
+  const radioMode = isRadioMode();
+  const radioSource = radioMode ? catalogSourceInfo(appState.searchType) : null;
+  const indiaNewsMode = appState.searchType === "india-news";
+  const worldNewsMode = appState.searchType === "world-news";
   const catalogSearch = isCatalogSearch();
   const results = filteredTracks(query);
   return `<section class="view" aria-labelledby="search-title">
     <p class="eyebrow">${radioMode ? "Radio Browser" : hindiMode ? "Wikimedia Commons" : catalogMode ? "Internet Archive open music" : "Find your sound"}</p>
-    <h1 class="page-title" id="search-title">${radioMode ? "Live Hindi radio" : hindiMode ? "Hindi & Hindustani music" : catalogMode ? "Search open music" : "Search your library"}</h1>
+    <h1 class="page-title" id="search-title">${radioMode ? radioSource.title : hindiMode ? "Hindi & Hindustani music" : catalogMode ? "Search open music" : "Search your library"}</h1>
     <form class="search-box" id="music-search-form" role="search">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.75" cy="10.75" r="6.75" /><path d="m16 16 4.5 4.5" /></svg>
-      <input id="search-input" class="search-input" value="${escapeHtml(query)}" autocomplete="off" placeholder="${radioMode ? "Station, city, genre, or Bollywood" : hindiMode ? "Hindi title, artist, raga, or folk song" : catalogMode ? "Artist, song, genre, or mood" : "Songs, artists, playlists"}" />
+      <input id="search-input" class="search-input" value="${escapeHtml(query)}" autocomplete="off" placeholder="${radioMode ? radioSource.searchPlaceholder : hindiMode ? "Hindi title, artist, raga, or folk song" : catalogMode ? "Artist, song, genre, or mood" : "Songs, artists, playlists"}" />
       <button class="search-submit" type="submit" aria-label="${radioMode ? "Search live radio" : catalogSearch ? "Search open music" : "Search your library"}">${searchIcon()}</button>
     </form>
     <div class="source-switch" aria-label="Music source">
       <button class="chip ${!appState.searchType || appState.searchType === "all" ? "is-active" : ""}" data-action="set-search-type" data-type="all" type="button">Your library</button>
       <button class="chip ${catalogMode ? "is-active" : ""}" data-action="set-search-type" data-type="catalog" type="button">Open catalog</button>
       <button class="chip ${hindiMode ? "is-active" : ""}" data-action="set-search-type" data-type="hindi" type="button">Hindi & Hindustani</button>
-      <button class="chip ${radioMode ? "is-active" : ""}" data-action="set-search-type" data-type="radio" type="button">Live Hindi radio</button>
+      <button class="chip ${appState.searchType === "radio" ? "is-active" : ""}" data-action="set-search-type" data-type="radio" type="button">Live Hindi radio</button>
+      <button class="chip ${indiaNewsMode ? "is-active" : ""}" data-action="set-search-type" data-type="india-news" type="button">India news</button>
+      <button class="chip ${worldNewsMode ? "is-active" : ""}" data-action="set-search-type" data-type="world-news" type="button">World news</button>
     </div>
     <div class="collection-filter" aria-label="Library collection">
       <button class="chip ${appState.searchType === "favorites" ? "is-active" : ""}" data-action="set-search-type" data-type="favorites" type="button">Favorites</button>
@@ -428,27 +486,28 @@ function searchResultsMarkup(results, query) {
 function catalogResultsMarkup() {
   const typedQuery = (appState.searchQuery || "").trim();
   const mode = activeCatalogMode();
+  const radioMode = isRadioMode(mode);
   const source = catalogSourceInfo(mode);
   const currentState = catalogState.mode === mode ? catalogState : { status: "idle", query: "", tracks: [], error: "", mode };
   if (currentState.status === "loading") {
-    return `<div class="empty-state"><div><span class="empty-icon">♫</span><h2>${mode === "radio" ? "Finding live stations" : "Finding open music"}</h2><p>${escapeHtml(source.loadingCopy)}</p></div></div>`;
+    return `<div class="empty-state"><div><span class="empty-icon">♫</span><h2>${radioMode ? "Finding live stations" : "Finding open music"}</h2><p>${escapeHtml(source.loadingCopy)}</p></div></div>`;
   }
   if (currentState.status === "error") {
-    return `<div class="empty-state"><div><span class="empty-icon">!</span><h2>${mode === "radio" ? "Radio directory unavailable" : "Catalog unavailable right now"}</h2><p>${escapeHtml(currentState.error)}</p><button class="button button--small" data-action="refresh-catalog" type="button">Try again</button></div></div>`;
+    return `<div class="empty-state"><div><span class="empty-icon">!</span><h2>${radioMode ? "Radio directory unavailable" : "Catalog unavailable right now"}</h2><p>${escapeHtml(currentState.error)}</p><button class="button button--small" data-action="refresh-catalog" type="button">Try again</button></div></div>`;
   }
   if (!currentState.tracks.length) {
     return `<div class="empty-state"><div><span class="empty-icon">♫</span><h2>${escapeHtml(source.emptyHeading)}</h2><p>${escapeHtml(source.emptyCopy)}</p><button class="button button--small" data-action="${source.quickAction}" type="button">${escapeHtml(source.quickLabel)}</button></div></div>`;
   }
   const needsRefresh = currentState.query !== typedQuery;
   const supportNote = mode === "hindi" ? " Some recordings use OGG or Opus, which depends on your phone browser support." : "";
-  const resultLabel = mode === "radio" ? "stations" : "streams";
-  const attribution = mode === "radio"
+  const resultLabel = radioMode ? "stations" : "streams";
+  const attribution = radioMode
     ? " Stations provide their own broadcasts; availability and rights are managed by each broadcaster. This is live radio, not an on-demand song catalog."
     : " Creator and license details stay with every result.";
-  const resultMeta = mode === "radio"
+  const resultMeta = radioMode
     ? `<span class="result-count"><span class="live-pill live-pill--compact"><i></i> Live</span>${currentState.tracks.length} stations</span>`
     : `<span class="result-count">${currentState.tracks.length} ${resultLabel}</span>`;
-  const radioHint = mode === "radio" ? `<p class="catalog-helper">Tap a station to begin a live broadcast.</p>` : "";
+  const radioHint = radioMode ? `<p class="catalog-helper">Tap a station to begin a live broadcast.</p>` : "";
   return `<section class="section catalog-results"><div class="section-header"><div><h2 class="section-title">${escapeHtml(source.title)}</h2>${radioHint}</div>${resultMeta}</div><p class="catalog-note">${escapeHtml(source.note)} <a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.name)}</a>.${attribution}${supportNote}</p>${needsRefresh ? `<p class="catalog-refresh">Tap search to update these results.</p>` : ""}${songRows(currentState.tracks, { queue: currentState.tracks.map((track) => track.id) })}</section>`;
 }
 
@@ -703,7 +762,9 @@ function safeHttpsUrl(value) {
   }
 }
 
-function radioStationToTrack(station) {
+function radioStationToTrack(station, mode) {
+  const directory = RADIO_DIRECTORY_MODES[mode];
+  if (!directory) return null;
   const streamUrl = safeHttpsUrl(station?.url_resolved);
   const codec = plainText(station?.codec || "").toUpperCase();
   const isCheckedOnline = station?.lastcheckok === true || Number(station?.lastcheckok) === 1;
@@ -714,10 +775,19 @@ function radioStationToTrack(station) {
   const nameText = name.toLocaleLowerCase();
   const tags = plainText(station?.tags || "").toLocaleLowerCase();
   const language = plainText(station?.language || "").toLocaleLowerCase();
-  const relevantLabel = /\b(hindi|bollywood|desi|hindustani)\b/.test(`${nameText} ${tags}`);
-  const compatibleLanguage = !language || /\b(hindi|urdu|hindustani)\b/.test(language);
-  const explicitlyRelevantName = /\b(hindi|bollywood|desi|hindustani)\b/.test(nameText);
-  if (!relevantLabel || (!compatibleLanguage && !explicitlyRelevantName)) return null;
+  const country = plainText(station?.country || "").toLocaleLowerCase();
+  const countryCode = plainText(station?.countrycode || "").toLocaleUpperCase();
+  const stationText = `${nameText} ${tags} ${language}`;
+  if (mode === "radio") {
+    const relevantLabel = /\b(hindi|bollywood|desi|hindustani)\b/.test(`${nameText} ${tags}`);
+    const compatibleLanguage = !language || /\b(hindi|urdu|hindustani)\b/.test(language);
+    const explicitlyRelevantName = /\b(hindi|bollywood|desi|hindustani)\b/.test(nameText);
+    if (!relevantLabel || (!compatibleLanguage && !explicitlyRelevantName)) return null;
+  } else {
+    const hasNewsLabel = /\b(news|headlines|current affairs|current-affairs|international)\b/.test(stationText);
+    if (!hasNewsLabel) return null;
+    if (mode === "india-news" && countryCode !== "IN" && !/\bindia\b/.test(country)) return null;
+  }
   const stationId = String(station?.stationuuid || `${name}-${streamUrl}`);
   const location = [station?.country, station?.state, station?.language]
     .map((value) => plainText(value))
@@ -725,14 +795,14 @@ function radioStationToTrack(station) {
     .filter((value, index, values) => values.indexOf(value) === index)
     .join(" · ");
   const homepage = safeHttpsUrl(station?.homepage) || RADIO_BROWSER_SITE_URL;
-  const id = `radio-${hashValue(stationId)}`;
+  const id = `radio-${mode}-${hashValue(stationId)}`;
   return {
     id,
     title: name,
-    artist: location || "Live Hindi radio",
-    album: tags ? `Live radio · ${tags}` : "Live Hindi radio",
+    artist: location || directory.fallbackArtist,
+    album: tags ? `${directory.collectionLabel} · ${tags}` : directory.collectionLabel,
     duration: 0,
-    color: hashValue(`radio-${stationId}`),
+    color: hashValue(`radio-${mode}-${stationId}`),
     streamUrl,
     sourcePage: homepage,
     sourceName: "Radio Browser",
@@ -744,70 +814,87 @@ function radioStationToTrack(station) {
   };
 }
 
-function radioSearchTerms(query) {
+function radioSearchTerms(query, mode) {
+  const ignoredTerms = ["radio", "live", "station", "stations", "news"];
+  if (mode === "radio") ignoredTerms.push("hindi", "bollywood", "india", "indian", "music");
+  if (mode === "india-news") ignoredTerms.push("india", "indian");
+  if (mode === "world-news") ignoredTerms.push("world", "worldwide", "international");
   return String(query || "")
     .trim()
     .toLocaleLowerCase()
     .split(/\s+/)
-    .filter((term) => term && !["hindi", "bollywood", "india", "indian", "radio", "live", "music"].includes(term));
+    .filter((term) => term && !ignoredTerms.includes(term));
 }
 
-function filterHindiRadioStations(stations, query) {
-  const terms = radioSearchTerms(query);
+function filterRadioStations(stations, query, mode) {
+  const terms = radioSearchTerms(query, mode);
   if (!terms.length) return stations;
   return stations.filter((station) => terms.every((term) => station.radioSearch.includes(term)));
 }
 
-async function fetchHindiRadioTag(tag, signal) {
+async function fetchRadioTag(mode, tag, signal) {
+  const directory = RADIO_DIRECTORY_MODES[mode];
   const params = new URLSearchParams({
     tag,
-    tagExact: "true",
+    tagExact: directory.tagExact ? "true" : "false",
     hidebroken: "true",
-    limit: "50",
+    limit: "75",
     order: "clickcount",
     reverse: "true"
   });
+  if (directory.countryCode) params.set("countrycode", directory.countryCode);
   const response = await fetch(`${RADIO_BROWSER_API_URL}/stations/search?${params.toString()}`, { signal });
   if (!response.ok) throw new Error("Radio Browser did not respond.");
   const stations = await response.json();
   if (!Array.isArray(stations)) throw new Error("Radio Browser returned an unexpected response.");
-  return stations.map(radioStationToTrack).filter(Boolean);
+  return stations.map((station) => radioStationToTrack(station, mode)).filter(Boolean);
 }
 
-async function searchHindiRadio(query, { refresh = false } = {}) {
+async function searchRadioDirectory(mode, query, { refresh = false } = {}) {
+  const directory = RADIO_DIRECTORY_MODES[mode];
+  if (!directory) return;
   const normalizedQuery = String(query || "").trim();
   catalogRequestController?.abort();
   const requestId = ++catalogRequestId;
   const controller = new AbortController();
   catalogRequestController = controller;
-  const previousTracks = catalogState.mode === "radio" ? catalogState.tracks : [];
-  catalogState = { status: "loading", query: normalizedQuery, tracks: previousTracks, error: "", mode: "radio" };
+  const previousTracks = catalogState.mode === mode ? catalogState.tracks : [];
+  catalogState = { status: "loading", query: normalizedQuery, tracks: previousTracks, error: "", mode };
   renderSearchResults();
 
   try {
-    if (!hindiRadioStations || refresh) {
-      const batches = await Promise.allSettled(HINDI_RADIO_TAGS.map((tag) => fetchHindiRadioTag(tag, controller.signal)));
+    if (!radioStationsByMode[mode] || refresh) {
+      const batches = await Promise.allSettled(directory.tags.map((tag) => fetchRadioTag(mode, tag, controller.signal)));
       if (requestId !== catalogRequestId) return;
       const stations = batches
         .filter((batch) => batch.status === "fulfilled")
         .flatMap((batch) => batch.value);
-      if (!stations.length) throw new Error("No available Hindi radio stations were returned.");
-      hindiRadioStations = [...new Map(stations.map((station) => [station.streamUrl, station])).values()]
+      if (!stations.length) throw new Error(`No available ${directory.title.toLocaleLowerCase()} stations were returned.`);
+      radioStationsByMode[mode] = [...new Map(stations.map((station) => [station.streamUrl, station])).values()]
         .sort((a, b) => b.popularity - a.popularity || a.title.localeCompare(b.title));
-      hindiRadioStations.forEach((station) => catalogTrackCache.set(station.id, station));
+      radioStationsByMode[mode].forEach((station) => catalogTrackCache.set(station.id, station));
     }
-    const stations = filterHindiRadioStations(hindiRadioStations, normalizedQuery).slice(0, 32);
-    catalogState = { status: "ready", query: normalizedQuery, tracks: stations, error: "", mode: "radio" };
+    const stations = filterRadioStations(radioStationsByMode[mode], normalizedQuery, mode).slice(0, 32);
+    catalogState = { status: "ready", query: normalizedQuery, tracks: stations, error: "", mode };
   } catch (error) {
     if (error?.name === "AbortError" || requestId !== catalogRequestId) return;
     console.error(error);
-    catalogState = { status: "error", query: normalizedQuery, tracks: [], error: "Check your connection, then try the live-radio directory again.", mode: "radio" };
+    catalogState = { status: "error", query: normalizedQuery, tracks: [], error: "Check your connection, then try the live-radio directory again.", mode };
   } finally {
     if (requestId === catalogRequestId) {
       catalogRequestController = null;
       renderSearchResults();
     }
   }
+}
+
+async function openRadioDirectory(mode) {
+  appState.searchType = mode;
+  appState.searchQuery = "";
+  window.location.hash = "search";
+  render();
+  $("#search-input")?.focus();
+  await searchRadioDirectory(mode, "");
 }
 
 function libraryMarkup() {
@@ -1389,7 +1476,7 @@ async function handleAction(action, button) {
       $("#search-input")?.focus();
       if (appState.searchType === "catalog") await searchOpenCatalog(appState.searchQuery || "");
       if (appState.searchType === "hindi") await searchHindiCatalog(appState.searchQuery || "");
-      if (appState.searchType === "radio") await searchHindiRadio(appState.searchQuery || "");
+      if (isRadioMode(appState.searchType)) await searchRadioDirectory(appState.searchType, appState.searchQuery || "");
       break;
     case "open-catalog":
       appState.searchType = "catalog";
@@ -1414,20 +1501,21 @@ async function handleAction(action, button) {
       await searchHindiCatalog(appState.searchQuery || "");
       break;
     case "open-live-radio":
-      appState.searchType = "radio";
-      appState.searchQuery = "";
-      window.location.hash = "search";
-      render();
-      $("#search-input")?.focus();
-      await searchHindiRadio("");
+      await openRadioDirectory("radio");
+      break;
+    case "open-india-news":
+      await openRadioDirectory("india-news");
+      break;
+    case "open-world-news":
+      await openRadioDirectory("world-news");
       break;
     case "refresh-catalog":
       if (appState.searchType === "hindi") await searchHindiCatalog(appState.searchQuery || catalogState.query || "");
-      else if (appState.searchType === "radio") await searchHindiRadio(appState.searchQuery || catalogState.query || "", { refresh: true });
+      else if (isRadioMode(appState.searchType)) await searchRadioDirectory(appState.searchType, appState.searchQuery || catalogState.query || "", { refresh: true });
       else await searchOpenCatalog(appState.searchQuery || catalogState.query || "");
       break;
     case "refresh-radio":
-      await searchHindiRadio(appState.searchQuery || catalogState.query || "", { refresh: true });
+      await searchRadioDirectory(appState.searchType, appState.searchQuery || catalogState.query || "", { refresh: true });
       break;
     case "set-library-filter":
       appState.libraryFilter = button.dataset.filter;
@@ -1509,8 +1597,8 @@ document.addEventListener("submit", async (event) => {
     await searchOpenCatalog(appState.searchQuery || "");
   } else if (appState.searchType === "hindi") {
     await searchHindiCatalog(appState.searchQuery || "");
-  } else if (appState.searchType === "radio") {
-    await searchHindiRadio(appState.searchQuery || "");
+  } else if (isRadioMode(appState.searchType)) {
+    await searchRadioDirectory(appState.searchType, appState.searchQuery || "");
   } else {
     renderSearchResults();
   }
