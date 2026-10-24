@@ -1588,6 +1588,13 @@ function finishLaunchScreen() {
   } catch { /* Keep the visual intro when session storage is unavailable. */ }
   const delay = reducedMotion || hasSeenLaunch ? 70 : 760;
   window.requestAnimationFrame(() => {
+    // A previous service-worker cache may serve old CSS during an upgrade.
+    // In that case, keep the new markup invisible instead of showing raw text.
+    if (window.getComputedStyle(launchScreen).position !== "fixed") {
+      launchScreen.remove();
+      return;
+    }
+    launchScreen.hidden = false;
     window.setTimeout(() => {
       launchScreen.classList.add("is-leaving");
       window.setTimeout(() => launchScreen.remove(), reducedMotion ? 40 : 280);
