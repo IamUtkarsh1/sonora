@@ -6,6 +6,12 @@ const AUDIO_STORE = "audio-files";
 const META_KEY = "sonora-library-v1";
 const ARCHIVE_SEARCH_URL = "https://archive.org/advancedsearch.php";
 const ARCHIVE_METADATA_URL = "https://archive.org/metadata/";
+const COMMONS_API_URL = "https://commons.wikimedia.org/w/api.php";
+const HINDI_COMMONS_CATEGORIES = [
+  { title: "Category:Hindi-language songs", label: "Hindi-language songs" },
+  { title: "Category:Audio files of Hindustani music", label: "Hindustani music" },
+  { title: "Category:Songs of India", label: "Songs of India" }
+];
 const COLORS = [
   ["#7967e9", "#f3a26e"],
   ["#4e88cb", "#8be0c1"],
@@ -45,8 +51,9 @@ let dbPromise = null;
 let deferredInstallPrompt = null;
 let catalogRequestController = null;
 let catalogRequestId = 0;
-let catalogState = { status: "idle", query: "", tracks: [], error: "" };
+let catalogState = { status: "idle", query: "", tracks: [], error: "", mode: "catalog" };
 let catalogTrackCache = new Map();
+let hindiCommonsTracks = null;
 let appState = loadState();
 let player = {
   currentId: null,
@@ -143,6 +150,41 @@ function trackById(id) {
     || catalogTrackCache.get(id);
 }
 
+function isCatalogSearch(type = appState.searchType) {
+  return type === "catalog" || type === "hindi";
+}
+
+function activeCatalogMode() {
+  return appState.searchType === "hindi" ? "hindi" : "catalog";
+}
+
+function catalogSourceInfo(mode = activeCatalogMode()) {
+  if (mode === "hindi") {
+    return {
+      name: "Wikimedia Commons",
+      title: "Hindi & Hindustani",
+      emptyHeading: "Hindi music, ready to stream",
+      emptyCopy: "Browse openly licensed Hindi-language songs, Hindustani classics, folk recordings, and Indian music from Wikimedia Commons.",
+      loadingCopy: "Loading openly licensed Hindi-language and Hindustani recordings from Wikimedia Commons.",
+      note: "Streaming openly licensed Hindi-language and Hindustani recordings from",
+      url: "https://commons.wikimedia.org/wiki/Category:Hindi-language_songs",
+      quickAction: "refresh-catalog",
+      quickLabel: "Show Hindi recordings"
+    };
+  }
+  return {
+    name: "Internet Archive Netlabels",
+    title: "Open catalog",
+    emptyHeading: "Free music, ready to stream",
+    emptyCopy: "Search openly licensed Creative Commons and public-domain music from Internet Archive Netlabels. Nothing is copied into your library unless you add your own file.",
+    loadingCopy: "Checking the Internet Archive catalog for openly licensed tracks that can stream here.",
+    note: "Streaming Creative Commons/public-domain audio from",
+    url: "https://archive.org/",
+    quickAction: "catalog-quick-query",
+    quickLabel: "Try ambient music"
+  };
+}
+
 function playlistById(id) {
   return appState.playlists.find((playlist) => playlist.id === id);
 }
@@ -227,11 +269,12 @@ function songRows(tracks, options = {}) {
     const current = isCurrent(track);
     const playing = current && isPlaying();
     const isCatalogTrack = Boolean(track.streamUrl);
+    const sourceName = track.sourceName || "Internet Archive";
     const secondary = isCatalogTrack
       ? `${escapeHtml(track.artist || "Open music")} · ${escapeHtml(track.licenseLabel || "Open license")}`
       : escapeHtml(track.artist || "Unknown artist");
     const actions = isCatalogTrack
-      ? `<a class="icon-button more-button song-action source-link" href="${escapeHtml(track.sourcePage)}" target="_blank" rel="noreferrer" aria-label="View ${escapeHtml(track.title)} on Internet Archive">${externalIcon()}</a>`
+      ? `<a class="icon-button more-button song-action source-link" href="${escapeHtml(track.sourcePage)}" target="_blank" rel="noreferrer" aria-label="View ${escapeHtml(track.title)} on ${escapeHtml(sourceName)}">${externalIcon()}</a>`
       : `<div class="song-menu">
           <button class="icon-button more-button song-action" data-action="toggle-menu" type="button" aria-label="More options for ${escapeHtml(track.title)}">${moreIcon()}</button>
           <div class="song-actions" role="menu">
@@ -247,7 +290,7 @@ function songRows(tracks, options = {}) {
       <button class="song-copy" data-action="play-track" data-id="${track.id}" data-queue="${queueAttribute}" type="button">
         <span class="song-title">${escapeHtml(track.title)}</span>
         <span class="song-artist">${secondary}</span>
-        ${isCatalogTrack ? `<span class="song-source">Internet Archive Netlabels · streaming online</span>` : ""}
+        ${isCatalogTrack ? `<span class="song-source">${escapeHtml(sourceName)} · streaming online</span>` : ""}
       </button>
       ${actions}
     </article>`;
@@ -267,7 +310,7 @@ function homeMarkup() {
         <p class="eyebrow">Your offline soundtrack</p>
         <h1 id="home-title">Music that stays yours.</h1>
         <p>${hasMusic ? "Your personal library is ready whenever you are — even when your signal is not." : "Add your own music for offline listening, or discover openly licensed tracks to stream online."}</p>
-        <div class="hero-actions"><button class="button" data-action="open-import" type="button">${addIcon()} Add music</button><button class="button button--ghost" data-action="open-catalog" type="button">Browse open music</button></div>
+        <div class="hero-actions"><button class="button" data-action="open-import" type="button">${addIcon()} Add music</button><button class="button button--ghost" data-action="open-catalog" type="button">Browse open music</button><button class="button button--ghost" data-action="open-hindi-catalog" type="button">Hindi music</button></div>
       </div>
     </div>
 
@@ -295,29 +338,32 @@ function homeMarkup() {
     </section>` : `<section class="section">
       <div class="empty-state"><div><span class="empty-icon">♫</span><h2>Your music will appear here</h2><p>Choose audio files from your phone or computer. They are stored in this browser, so you can keep listening offline.</p><button class="button" data-action="open-import" type="button">${addIcon()} Import your first song</button></div></div>
     </section>`}
-    <section class="section catalog-callout"><div><p class="eyebrow">Listen online</p><h2 class="section-title">Explore free, open music</h2><p>Search Creative Commons and public-domain audio from Internet Archive Netlabels, then stream it without adding files to your phone.</p></div><button class="button button--small" data-action="open-catalog" type="button">Open catalog</button></section>
+    <section class="section catalog-callout"><div><p class="eyebrow">Listen online</p><h2 class="section-title">Explore free, open music</h2><p>Search Creative Commons and public-domain audio from Internet Archive Netlabels, or open Hindi/Hindustani recordings from Wikimedia Commons.</p></div><div class="catalog-callout-actions"><button class="button button--small" data-action="open-catalog" type="button">Open catalog</button><button class="button button--small button--ghost" data-action="open-hindi-catalog" type="button">Hindi music</button></div></section>
   </section>`;
 }
 
 function searchMarkup() {
   const query = appState.searchQuery || "";
   const catalogMode = appState.searchType === "catalog";
+  const hindiMode = appState.searchType === "hindi";
+  const catalogSearch = isCatalogSearch();
   const results = filteredTracks(query);
   return `<section class="view" aria-labelledby="search-title">
-    <p class="eyebrow">${catalogMode ? "Internet Archive open music" : "Find your sound"}</p>
-    <h1 class="page-title" id="search-title">${catalogMode ? "Search open music" : "Search your library"}</h1>
+    <p class="eyebrow">${hindiMode ? "Wikimedia Commons" : catalogMode ? "Internet Archive open music" : "Find your sound"}</p>
+    <h1 class="page-title" id="search-title">${hindiMode ? "Hindi & Hindustani music" : catalogMode ? "Search open music" : "Search your library"}</h1>
     <form class="search-box" id="music-search-form" role="search">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.75" cy="10.75" r="6.75" /><path d="m16 16 4.5 4.5" /></svg>
-      <input id="search-input" class="search-input" value="${escapeHtml(query)}" autocomplete="off" placeholder="${catalogMode ? "Artist, song, genre, or mood" : "Songs, artists, playlists"}" />
-      <button class="search-submit" type="submit" aria-label="${catalogMode ? "Search open music" : "Search your library"}">${searchIcon()}</button>
+      <input id="search-input" class="search-input" value="${escapeHtml(query)}" autocomplete="off" placeholder="${hindiMode ? "Hindi title, artist, raga, or folk song" : catalogMode ? "Artist, song, genre, or mood" : "Songs, artists, playlists"}" />
+      <button class="search-submit" type="submit" aria-label="${catalogSearch ? "Search open music" : "Search your library"}">${searchIcon()}</button>
     </form>
     <div class="filter-row" aria-label="Search filter">
       <button class="chip ${!appState.searchType || appState.searchType === "all" ? "is-active" : ""}" data-action="set-search-type" data-type="all" type="button">Your library</button>
       <button class="chip ${catalogMode ? "is-active" : ""}" data-action="set-search-type" data-type="catalog" type="button">Open catalog</button>
+      <button class="chip ${hindiMode ? "is-active" : ""}" data-action="set-search-type" data-type="hindi" type="button">Hindi & Hindustani</button>
       <button class="chip ${appState.searchType === "favorites" ? "is-active" : ""}" data-action="set-search-type" data-type="favorites" type="button">Favorites</button>
       <button class="chip ${appState.searchType === "playlists" ? "is-active" : ""}" data-action="set-search-type" data-type="playlists" type="button">Playlists</button>
     </div>
-    <div id="search-results">${catalogMode ? catalogResultsMarkup() : searchResultsMarkup(results, query)}</div>
+    <div id="search-results">${catalogSearch ? catalogResultsMarkup() : searchResultsMarkup(results, query)}</div>
   </section>`;
 }
 
@@ -342,17 +388,21 @@ function searchResultsMarkup(results, query) {
 
 function catalogResultsMarkup() {
   const typedQuery = (appState.searchQuery || "").trim();
-  if (catalogState.status === "loading") {
-    return `<div class="empty-state"><div><span class="empty-icon">♫</span><h2>Finding open music</h2><p>Checking the Internet Archive catalog for openly licensed tracks that can stream here.</p></div></div>`;
+  const mode = activeCatalogMode();
+  const source = catalogSourceInfo(mode);
+  const currentState = catalogState.mode === mode ? catalogState : { status: "idle", query: "", tracks: [], error: "", mode };
+  if (currentState.status === "loading") {
+    return `<div class="empty-state"><div><span class="empty-icon">♫</span><h2>Finding open music</h2><p>${escapeHtml(source.loadingCopy)}</p></div></div>`;
   }
-  if (catalogState.status === "error") {
-    return `<div class="empty-state"><div><span class="empty-icon">!</span><h2>Catalog unavailable right now</h2><p>${escapeHtml(catalogState.error)}</p><button class="button button--small" data-action="refresh-catalog" type="button">Try again</button></div></div>`;
+  if (currentState.status === "error") {
+    return `<div class="empty-state"><div><span class="empty-icon">!</span><h2>Catalog unavailable right now</h2><p>${escapeHtml(currentState.error)}</p><button class="button button--small" data-action="refresh-catalog" type="button">Try again</button></div></div>`;
   }
-  if (!catalogState.tracks.length) {
-    return `<div class="empty-state"><div><span class="empty-icon">♫</span><h2>Free music, ready to stream</h2><p>Search openly licensed Creative Commons and public-domain music from Internet Archive Netlabels. Nothing is copied into your library unless you add your own file.</p><button class="button button--small" data-action="catalog-quick-query" data-query="ambient" type="button">Try ambient music</button></div></div>`;
+  if (!currentState.tracks.length) {
+    return `<div class="empty-state"><div><span class="empty-icon">♫</span><h2>${escapeHtml(source.emptyHeading)}</h2><p>${escapeHtml(source.emptyCopy)}</p><button class="button button--small" data-action="${source.quickAction}" type="button">${escapeHtml(source.quickLabel)}</button></div></div>`;
   }
-  const needsRefresh = catalogState.query !== typedQuery;
-  return `<section class="section"><div class="section-header"><h2 class="section-title">Open catalog</h2><span class="text-link">${catalogState.tracks.length} streams</span></div><p class="catalog-note">Streaming Creative Commons/public-domain audio from <a href="https://archive.org/" target="_blank" rel="noreferrer">Internet Archive Netlabels</a>. Creator and license details stay with every result.</p>${needsRefresh ? `<p class="catalog-refresh">Tap search to update these results.</p>` : ""}${songRows(catalogState.tracks, { queue: catalogState.tracks.map((track) => track.id) })}</section>`;
+  const needsRefresh = currentState.query !== typedQuery;
+  const supportNote = mode === "hindi" ? " Some recordings use OGG or Opus, which depends on your phone browser support." : "";
+  return `<section class="section"><div class="section-header"><h2 class="section-title">${escapeHtml(source.title)}</h2><span class="text-link">${currentState.tracks.length} streams</span></div><p class="catalog-note">${escapeHtml(source.note)} <a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.name)}</a>. Creator and license details stay with every result.${supportNote}</p>${needsRefresh ? `<p class="catalog-refresh">Tap search to update these results.</p>` : ""}${songRows(currentState.tracks, { queue: currentState.tracks.map((track) => track.id) })}</section>`;
 }
 
 function cleanCatalogQuery(value) {
@@ -415,6 +465,88 @@ function openLicenseLabel(url) {
   return /publicdomain/i.test(String(url || "")) ? "Public domain" : "Creative Commons";
 }
 
+function plainText(value) {
+  const template = document.createElement("template");
+  template.innerHTML = String(value || "");
+  return (template.content.textContent || "").replace(/\s+/g, " ").trim();
+}
+
+function isCommonsAudioFile(page, info) {
+  const title = String(page?.title || "");
+  const url = String(info?.url || "");
+  const mime = String(info?.mime || "").toLowerCase();
+  return mime.startsWith("audio/")
+    || /application\/(ogg|opus)/.test(mime)
+    || /\.(mp3|m4a|aac|wav|ogg|oga|opus|flac)(?:$|\?)/i.test(`${title} ${url}`);
+}
+
+function commonsPageToTrack(page, category, index) {
+  const info = page?.imageinfo?.[0];
+  if (!info || !isCommonsAudioFile(page, info)) return null;
+  const byteSize = Number(info.size || 0);
+  if (byteSize > 50 * 1024 * 1024) return null;
+  const metadata = info.extmetadata || {};
+  const licenseLabel = plainText(metadata.LicenseShortName?.value || metadata.UsageTerms?.value || "");
+  const licenseUrl = plainText(metadata.LicenseUrl?.value || "");
+  if (!licenseLabel || /unknown|non-free|fair use/i.test(licenseLabel)) return null;
+  const fileTitle = String(page.title || "Untitled Hindi recording")
+    .replace(/^File:/i, "")
+    .replace(/\.(mp3|m4a|aac|wav|ogg|oga|opus|flac)$/i, "");
+  const title = plainText(metadata.ObjectName?.value) || fileTitle;
+  const artist = plainText(metadata.Artist?.value) || "Wikimedia Commons contributor";
+  const pageId = page.pageid || `${category.title}-${index}-${title}`;
+  return {
+    id: `commons-${pageId}`,
+    title,
+    artist,
+    album: category.label,
+    duration: 0,
+    color: hashValue(`commons-${pageId}`),
+    streamUrl: String(info.url || ""),
+    sourcePage: String(info.descriptionurl || `https://commons.wikimedia.org/wiki/${encodeURIComponent(page.title || "")}`),
+    sourceName: "Wikimedia Commons",
+    licenseLabel,
+    licenseUrl: licenseUrl || String(info.descriptionurl || "")
+  };
+}
+
+function hindiSearchTerms(query) {
+  return String(query || "")
+    .trim()
+    .toLocaleLowerCase()
+    .split(/\s+/)
+    .filter((term) => term && !["hindi", "hindustani", "india", "indian", "music", "song", "songs"].includes(term));
+}
+
+function filterHindiCommonsTracks(tracks, query) {
+  const terms = hindiSearchTerms(query);
+  if (!terms.length) return tracks;
+  return tracks.filter((track) => {
+    const haystack = [track.title, track.artist, track.album].join(" ").toLocaleLowerCase();
+    return terms.every((term) => haystack.includes(term));
+  });
+}
+
+async function fetchHindiCommonsCategory(category, signal) {
+  const params = new URLSearchParams({
+    action: "query",
+    format: "json",
+    formatversion: "2",
+    origin: "*",
+    generator: "categorymembers",
+    gcmtitle: category.title,
+    gcmtype: "file",
+    gcmlimit: "100",
+    prop: "imageinfo",
+    iiprop: "url|mime|size|extmetadata"
+  });
+  const response = await fetch(`${COMMONS_API_URL}?${params.toString()}`, { signal });
+  if (!response.ok) throw new Error("Wikimedia Commons did not respond.");
+  const payload = await response.json();
+  const pages = Array.isArray(payload?.query?.pages) ? payload.query.pages : Object.values(payload?.query?.pages || {});
+  return pages.map((page, index) => commonsPageToTrack(page, category, index)).filter(Boolean);
+}
+
 async function archiveDocumentToTrack(document, index, signal) {
   const identifier = String(document.identifier || "");
   if (!identifier) return null;
@@ -435,6 +567,7 @@ async function archiveDocumentToTrack(document, index, signal) {
     color: hashValue(`${identifier}/${fileName}`),
     streamUrl: `https://archive.org/download/${encodeURIComponent(identifier)}/${archiveFilePath(fileName)}`,
     sourcePage: `https://archive.org/details/${encodeURIComponent(identifier)}`,
+    sourceName: "Internet Archive Netlabels",
     licenseLabel: openLicenseLabel(licenseUrl),
     licenseUrl
   };
@@ -446,7 +579,8 @@ async function searchOpenCatalog(query) {
   const requestId = ++catalogRequestId;
   const controller = new AbortController();
   catalogRequestController = controller;
-  catalogState = { status: "loading", query: normalizedQuery, tracks: catalogState.tracks, error: "" };
+  const previousTracks = catalogState.mode === "catalog" ? catalogState.tracks : [];
+  catalogState = { status: "loading", query: normalizedQuery, tracks: previousTracks, error: "", mode: "catalog" };
   renderSearchResults();
 
   try {
@@ -463,11 +597,48 @@ async function searchOpenCatalog(query) {
       .map((candidate) => candidate.value)
       .slice(0, 8);
     tracks.forEach((track) => catalogTrackCache.set(track.id, track));
-    catalogState = { status: "ready", query: normalizedQuery, tracks, error: "" };
+    catalogState = { status: "ready", query: normalizedQuery, tracks, error: "", mode: "catalog" };
   } catch (error) {
-    if (error.name === "AbortError" || requestId !== catalogRequestId) return;
+    if (error?.name === "AbortError" || requestId !== catalogRequestId) return;
     console.error(error);
-    catalogState = { status: "error", query: normalizedQuery, tracks: [], error: "Check your connection, then search the catalog again." };
+    catalogState = { status: "error", query: normalizedQuery, tracks: [], error: "Check your connection, then search the catalog again.", mode: "catalog" };
+  } finally {
+    if (requestId === catalogRequestId) {
+      catalogRequestController = null;
+      renderSearchResults();
+    }
+  }
+}
+
+async function searchHindiCatalog(query) {
+  const normalizedQuery = String(query || "").trim();
+  catalogRequestController?.abort();
+  const requestId = ++catalogRequestId;
+  const controller = new AbortController();
+  catalogRequestController = controller;
+  const previousTracks = catalogState.mode === "hindi" ? catalogState.tracks : [];
+  catalogState = { status: "loading", query: normalizedQuery, tracks: previousTracks, error: "", mode: "hindi" };
+  renderSearchResults();
+
+  try {
+    if (!hindiCommonsTracks) {
+      const batches = await Promise.allSettled(HINDI_COMMONS_CATEGORIES.map((category) => fetchHindiCommonsCategory(category, controller.signal)));
+      if (requestId !== catalogRequestId) return;
+      const tracks = batches
+        .filter((batch) => batch.status === "fulfilled")
+        .flatMap((batch) => batch.value);
+      if (!tracks.length) throw new Error("No open Hindi recordings were returned.");
+      const uniqueTracks = [...new Map(tracks.map((track) => [track.id, track])).values()]
+        .sort((a, b) => a.title.localeCompare(b.title));
+      hindiCommonsTracks = uniqueTracks;
+      uniqueTracks.forEach((track) => catalogTrackCache.set(track.id, track));
+    }
+    const tracks = filterHindiCommonsTracks(hindiCommonsTracks, normalizedQuery).slice(0, 32);
+    catalogState = { status: "ready", query: normalizedQuery, tracks, error: "", mode: "hindi" };
+  } catch (error) {
+    if (error?.name === "AbortError" || requestId !== catalogRequestId) return;
+    console.error(error);
+    catalogState = { status: "error", query: normalizedQuery, tracks: [], error: "Check your connection, then try the Hindi catalog again.", mode: "hindi" };
   } finally {
     if (requestId === catalogRequestId) {
       catalogRequestController = null;
@@ -548,7 +719,7 @@ function render() {
 function renderSearchResults() {
   const target = $("#search-results");
   if (!target) return;
-  target.innerHTML = appState.searchType === "catalog"
+  target.innerHTML = isCatalogSearch()
     ? catalogResultsMarkup()
     : searchResultsMarkup(filteredTracks(appState.searchQuery || ""), appState.searchQuery || "");
 }
@@ -908,11 +1079,12 @@ function renderNowPlaying() {
   const queue = currentQueue().map(trackById).filter(Boolean);
   const [a, b] = colorFor(track);
   const isCatalogTrack = Boolean(track.streamUrl);
+  const sourceName = track.sourceName || "Internet Archive";
   const topAction = isCatalogTrack
-    ? `<a class="icon-button" href="${escapeHtml(track.sourcePage)}" target="_blank" rel="noreferrer" aria-label="View source on Internet Archive">${externalIcon()}</a>`
+    ? `<a class="icon-button" href="${escapeHtml(track.sourcePage)}" target="_blank" rel="noreferrer" aria-label="View source on ${escapeHtml(sourceName)}">${externalIcon()}</a>`
     : `<button class="icon-button" data-action="add-to-playlist" data-id="${track.id}" type="button" aria-label="Add to playlist">${addIcon()}</button>`;
   const sourceDetails = isCatalogTrack
-    ? `<a class="catalog-now-source" href="${escapeHtml(track.licenseUrl || track.sourcePage)}" target="_blank" rel="noreferrer">${escapeHtml(track.licenseLabel || "Open license")} · Internet Archive</a>`
+    ? `<a class="catalog-now-source" href="${escapeHtml(track.licenseUrl || track.sourcePage)}" target="_blank" rel="noreferrer">${escapeHtml(track.licenseLabel || "Open license")} · ${escapeHtml(sourceName)}</a>`
     : "";
   const favoriteControl = isCatalogTrack
     ? ""
@@ -1030,6 +1202,7 @@ async function handleAction(action, button) {
       render();
       $("#search-input")?.focus();
       if (appState.searchType === "catalog") await searchOpenCatalog(appState.searchQuery || "");
+      if (appState.searchType === "hindi") await searchHindiCatalog(appState.searchQuery || "");
       break;
     case "open-catalog":
       appState.searchType = "catalog";
@@ -1046,8 +1219,16 @@ async function handleAction(action, button) {
       $("#search-input")?.focus();
       await searchOpenCatalog(appState.searchQuery);
       break;
+    case "open-hindi-catalog":
+      appState.searchType = "hindi";
+      window.location.hash = "search";
+      render();
+      $("#search-input")?.focus();
+      await searchHindiCatalog(appState.searchQuery || "");
+      break;
     case "refresh-catalog":
-      await searchOpenCatalog(appState.searchQuery || catalogState.query || "");
+      if (appState.searchType === "hindi") await searchHindiCatalog(appState.searchQuery || catalogState.query || "");
+      else await searchOpenCatalog(appState.searchQuery || catalogState.query || "");
       break;
     case "set-library-filter":
       appState.libraryFilter = button.dataset.filter;
@@ -1127,6 +1308,8 @@ document.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (appState.searchType === "catalog") {
     await searchOpenCatalog(appState.searchQuery || "");
+  } else if (appState.searchType === "hindi") {
+    await searchHindiCatalog(appState.searchQuery || "");
   } else {
     renderSearchResults();
   }
