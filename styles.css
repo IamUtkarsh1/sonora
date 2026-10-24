@@ -127,6 +127,7 @@ svg { display: block; width: 1.35rem; height: 1.35rem; fill: none; stroke: curre
 .catalog-callout { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.1rem; background: rgba(154,140,255,0.09); border: 1px solid rgba(154,140,255,0.22); border-radius: 1rem; }
 .catalog-callout p:not(.eyebrow) { max-width: 32rem; margin: 0.45rem 0 0; color: var(--muted); font-size: 0.85rem; line-height: 1.45; }
 .catalog-callout .button { flex: 0 0 auto; }
+.catalog-callout-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; }
 .catalog-note, .catalog-refresh { margin: 0 0 0.85rem; color: var(--muted); font-size: 0.8rem; line-height: 1.45; }
 .catalog-note a, .catalog-refresh, .catalog-now-source { color: var(--purple-strong); }
 
@@ -219,6 +220,7 @@ svg { display: block; width: 1.35rem; height: 1.35rem; fill: none; stroke: curre
   .stat-card { padding: 0.72rem; }
   .install-button { padding-right: 0.58rem; padding-left: 0.58rem; }
   .catalog-callout { align-items: flex-start; flex-direction: column; }
+  .catalog-callout-actions { justify-content: flex-start; }
 }
 
 @media (prefers-reduced-motion: reduce) {
