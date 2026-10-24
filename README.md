@@ -1,6 +1,6 @@
 # Sonora
 
-Sonora is an installable, offline-first personal music player. It plays audio files that you own or are allowed to use, and it can also stream openly licensed music from Internet Archive Netlabels and Hindi/Hindustani recordings from Wikimedia Commons. It also includes a separate live Hindi/Bollywood radio directory powered by Radio Browser.
+Sonora is an installable, offline-first personal music player. It plays audio files that you own or are allowed to use, and it can also stream openly licensed music from Internet Archive Netlabels and Hindi/Hindustani recordings from Wikimedia Commons. It also includes separate live Hindi/Bollywood, India news, and world news radio directories powered by Radio Browser.
 
 ## Use it on your phone
 
@@ -16,7 +16,7 @@ Sonora is an installable, offline-first personal music player. It plays audio fi
 - Persist the library and imported audio locally with IndexedDB.
 - Use supported lock-screen/headphone controls through the Media Session API.
 - Search open, streamable music from Internet Archive Netlabels and the Hindi & Hindustani shelf from Wikimedia Commons. Catalog tracks stay online, show their source/license context, and are not copied into your library.
-- Tune into available Hindi/Bollywood live-radio stations from Radio Browser. Stations are continuous broadcasts, not a searchable on-demand catalog.
+- Tune into available Hindi/Bollywood, India news, and world news live-radio stations from Radio Browser. Stations are continuous broadcasts, not searchable on-demand catalogs.
 
 ## Important
 
@@ -26,4 +26,4 @@ Your music is stored in the browser on that device. Clearing the browser's site 
 
 The general catalog uses Internet Archive's public search and metadata endpoints to find Creative Commons or public-domain audio from its Netlabels collection. The Hindi & Hindustani shelf uses Wikimedia Commons' public API to find openly licensed Hindi-language songs, Hindustani classical music, folk recordings, and Songs of India. Sonora streams original files from their source; it does not download, rehost, or claim ownership of catalog audio. Availability, attribution, license terms, and phone-browser format support remain with each source item.
 
-The Live Hindi radio shelf queries Radio Browser's open-source directory for public station streams that are currently checked online and use secure MP3/AAC URLs. Radio Browser is a directory, not the broadcaster or music-rights holder: each station controls its programming, availability, territory, and broadcast rights. Sonora intentionally labels this as live radio rather than an all-songs or on-demand catalog.
+The live-radio shelves query Radio Browser's open-source directory for public station streams that are currently checked online and use secure MP3/AAC URLs. The India news shelf filters for public Indian news stations; the World news shelf searches public news stations internationally. Radio Browser is a directory, not the broadcaster or music-rights holder: each station controls its programming, availability, territory, and broadcast rights. Sonora intentionally labels these as live radio rather than an all-songs or on-demand catalog.
