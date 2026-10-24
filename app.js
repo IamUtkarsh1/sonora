@@ -7,11 +7,14 @@ const META_KEY = "sonora-library-v1";
 const ARCHIVE_SEARCH_URL = "https://archive.org/advancedsearch.php";
 const ARCHIVE_METADATA_URL = "https://archive.org/metadata/";
 const COMMONS_API_URL = "https://commons.wikimedia.org/w/api.php";
+const RADIO_BROWSER_API_URL = "https://de1.api.radio-browser.info/json";
+const RADIO_BROWSER_SITE_URL = "https://www.radio-browser.info/";
 const HINDI_COMMONS_CATEGORIES = [
   { title: "Category:Hindi-language songs", label: "Hindi-language songs" },
   { title: "Category:Audio files of Hindustani music", label: "Hindustani music" },
   { title: "Category:Songs of India", label: "Songs of India" }
 ];
+const HINDI_RADIO_TAGS = ["bollywood", "hindi", "indian"];
 const COLORS = [
   ["#7967e9", "#f3a26e"],
   ["#4e88cb", "#8be0c1"],
@@ -54,6 +57,7 @@ let catalogRequestId = 0;
 let catalogState = { status: "idle", query: "", tracks: [], error: "", mode: "catalog" };
 let catalogTrackCache = new Map();
 let hindiCommonsTracks = null;
+let hindiRadioStations = null;
 let appState = loadState();
 let player = {
   currentId: null,
@@ -151,11 +155,11 @@ function trackById(id) {
 }
 
 function isCatalogSearch(type = appState.searchType) {
-  return type === "catalog" || type === "hindi";
+  return type === "catalog" || type === "hindi" || type === "radio";
 }
 
 function activeCatalogMode() {
-  return appState.searchType === "hindi" ? "hindi" : "catalog";
+  return isCatalogSearch() ? appState.searchType : "catalog";
 }
 
 function catalogSourceInfo(mode = activeCatalogMode()) {
@@ -170,6 +174,19 @@ function catalogSourceInfo(mode = activeCatalogMode()) {
       url: "https://commons.wikimedia.org/wiki/Category:Hindi-language_songs",
       quickAction: "refresh-catalog",
       quickLabel: "Show Hindi recordings"
+    };
+  }
+  if (mode === "radio") {
+    return {
+      name: "Radio Browser",
+      title: "Live Hindi radio",
+      emptyHeading: "Live Hindi radio, ready to play",
+      emptyCopy: "Browse public Hindi and Bollywood radio stations. Each station plays a continuous live broadcast, not a song-on-demand catalog.",
+      loadingCopy: "Finding currently available Hindi and Bollywood radio stations.",
+      note: "Listening to public live-station streams listed by",
+      url: RADIO_BROWSER_SITE_URL,
+      quickAction: "refresh-radio",
+      quickLabel: "Find live stations"
     };
   }
   return {
@@ -269,9 +286,10 @@ function songRows(tracks, options = {}) {
     const current = isCurrent(track);
     const playing = current && isPlaying();
     const isCatalogTrack = Boolean(track.streamUrl);
+    const isLiveStation = Boolean(track.isLive);
     const sourceName = track.sourceName || "Internet Archive";
     const secondary = isCatalogTrack
-      ? `${escapeHtml(track.artist || "Open music")} · ${escapeHtml(track.licenseLabel || "Open license")}`
+      ? `${escapeHtml(track.artist || "Open music")} · ${escapeHtml(isLiveStation ? "Live station" : track.licenseLabel || "Open license")}`
       : escapeHtml(track.artist || "Unknown artist");
     const actions = isCatalogTrack
       ? `<a class="icon-button more-button song-action source-link" href="${escapeHtml(track.sourcePage)}" target="_blank" rel="noreferrer" aria-label="View ${escapeHtml(track.title)} on ${escapeHtml(sourceName)}">${externalIcon()}</a>`
@@ -290,7 +308,7 @@ function songRows(tracks, options = {}) {
       <button class="song-copy" data-action="play-track" data-id="${track.id}" data-queue="${queueAttribute}" type="button">
         <span class="song-title">${escapeHtml(track.title)}</span>
         <span class="song-artist">${secondary}</span>
-        ${isCatalogTrack ? `<span class="song-source">${escapeHtml(sourceName)} · streaming online</span>` : ""}
+        ${isCatalogTrack ? `<span class="song-source">${escapeHtml(sourceName)} · ${isLiveStation ? "live radio" : "streaming online"}</span>` : ""}
       </button>
       ${actions}
     </article>`;
@@ -310,7 +328,7 @@ function homeMarkup() {
         <p class="eyebrow">Your offline soundtrack</p>
         <h1 id="home-title">Music that stays yours.</h1>
         <p>${hasMusic ? "Your personal library is ready whenever you are — even when your signal is not." : "Add your own music for offline listening, or discover openly licensed tracks to stream online."}</p>
-        <div class="hero-actions"><button class="button" data-action="open-import" type="button">${addIcon()} Add music</button><button class="button button--ghost" data-action="open-catalog" type="button">Browse open music</button><button class="button button--ghost" data-action="open-hindi-catalog" type="button">Hindi music</button></div>
+        <div class="hero-actions"><button class="button" data-action="open-import" type="button">${addIcon()} Add music</button><button class="button button--ghost" data-action="open-catalog" type="button">Browse open music</button><button class="button button--ghost" data-action="open-hindi-catalog" type="button">Hindi music</button><button class="button button--ghost" data-action="open-live-radio" type="button">Live Hindi radio</button></div>
       </div>
     </div>
 
@@ -338,7 +356,7 @@ function homeMarkup() {
     </section>` : `<section class="section">
       <div class="empty-state"><div><span class="empty-icon">♫</span><h2>Your music will appear here</h2><p>Choose audio files from your phone or computer. They are stored in this browser, so you can keep listening offline.</p><button class="button" data-action="open-import" type="button">${addIcon()} Import your first song</button></div></div>
     </section>`}
-    <section class="section catalog-callout"><div><p class="eyebrow">Listen online</p><h2 class="section-title">Explore free, open music</h2><p>Search Creative Commons and public-domain audio from Internet Archive Netlabels, or open Hindi/Hindustani recordings from Wikimedia Commons.</p></div><div class="catalog-callout-actions"><button class="button button--small" data-action="open-catalog" type="button">Open catalog</button><button class="button button--small button--ghost" data-action="open-hindi-catalog" type="button">Hindi music</button></div></section>
+    <section class="section catalog-callout"><div><p class="eyebrow">Listen online</p><h2 class="section-title">Explore free music and live radio</h2><p>Search Creative Commons and public-domain audio from Internet Archive Netlabels, open Hindi/Hindustani recordings from Wikimedia Commons, or tune into live Hindi radio.</p></div><div class="catalog-callout-actions"><button class="button button--small" data-action="open-catalog" type="button">Open catalog</button><button class="button button--small button--ghost" data-action="open-hindi-catalog" type="button">Hindi music</button><button class="button button--small button--ghost" data-action="open-live-radio" type="button">Live radio</button></div></section>
   </section>`;
 }
 
@@ -346,20 +364,22 @@ function searchMarkup() {
   const query = appState.searchQuery || "";
   const catalogMode = appState.searchType === "catalog";
   const hindiMode = appState.searchType === "hindi";
+  const radioMode = appState.searchType === "radio";
   const catalogSearch = isCatalogSearch();
   const results = filteredTracks(query);
   return `<section class="view" aria-labelledby="search-title">
-    <p class="eyebrow">${hindiMode ? "Wikimedia Commons" : catalogMode ? "Internet Archive open music" : "Find your sound"}</p>
-    <h1 class="page-title" id="search-title">${hindiMode ? "Hindi & Hindustani music" : catalogMode ? "Search open music" : "Search your library"}</h1>
+    <p class="eyebrow">${radioMode ? "Radio Browser" : hindiMode ? "Wikimedia Commons" : catalogMode ? "Internet Archive open music" : "Find your sound"}</p>
+    <h1 class="page-title" id="search-title">${radioMode ? "Live Hindi radio" : hindiMode ? "Hindi & Hindustani music" : catalogMode ? "Search open music" : "Search your library"}</h1>
     <form class="search-box" id="music-search-form" role="search">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.75" cy="10.75" r="6.75" /><path d="m16 16 4.5 4.5" /></svg>
-      <input id="search-input" class="search-input" value="${escapeHtml(query)}" autocomplete="off" placeholder="${hindiMode ? "Hindi title, artist, raga, or folk song" : catalogMode ? "Artist, song, genre, or mood" : "Songs, artists, playlists"}" />
-      <button class="search-submit" type="submit" aria-label="${catalogSearch ? "Search open music" : "Search your library"}">${searchIcon()}</button>
+      <input id="search-input" class="search-input" value="${escapeHtml(query)}" autocomplete="off" placeholder="${radioMode ? "Station, city, genre, or Bollywood" : hindiMode ? "Hindi title, artist, raga, or folk song" : catalogMode ? "Artist, song, genre, or mood" : "Songs, artists, playlists"}" />
+      <button class="search-submit" type="submit" aria-label="${radioMode ? "Search live radio" : catalogSearch ? "Search open music" : "Search your library"}">${searchIcon()}</button>
     </form>
     <div class="filter-row" aria-label="Search filter">
       <button class="chip ${!appState.searchType || appState.searchType === "all" ? "is-active" : ""}" data-action="set-search-type" data-type="all" type="button">Your library</button>
       <button class="chip ${catalogMode ? "is-active" : ""}" data-action="set-search-type" data-type="catalog" type="button">Open catalog</button>
       <button class="chip ${hindiMode ? "is-active" : ""}" data-action="set-search-type" data-type="hindi" type="button">Hindi & Hindustani</button>
+      <button class="chip ${radioMode ? "is-active" : ""}" data-action="set-search-type" data-type="radio" type="button">Live Hindi radio</button>
       <button class="chip ${appState.searchType === "favorites" ? "is-active" : ""}" data-action="set-search-type" data-type="favorites" type="button">Favorites</button>
       <button class="chip ${appState.searchType === "playlists" ? "is-active" : ""}" data-action="set-search-type" data-type="playlists" type="button">Playlists</button>
     </div>
@@ -392,17 +412,21 @@ function catalogResultsMarkup() {
   const source = catalogSourceInfo(mode);
   const currentState = catalogState.mode === mode ? catalogState : { status: "idle", query: "", tracks: [], error: "", mode };
   if (currentState.status === "loading") {
-    return `<div class="empty-state"><div><span class="empty-icon">♫</span><h2>Finding open music</h2><p>${escapeHtml(source.loadingCopy)}</p></div></div>`;
+    return `<div class="empty-state"><div><span class="empty-icon">♫</span><h2>${mode === "radio" ? "Finding live stations" : "Finding open music"}</h2><p>${escapeHtml(source.loadingCopy)}</p></div></div>`;
   }
   if (currentState.status === "error") {
-    return `<div class="empty-state"><div><span class="empty-icon">!</span><h2>Catalog unavailable right now</h2><p>${escapeHtml(currentState.error)}</p><button class="button button--small" data-action="refresh-catalog" type="button">Try again</button></div></div>`;
+    return `<div class="empty-state"><div><span class="empty-icon">!</span><h2>${mode === "radio" ? "Radio directory unavailable" : "Catalog unavailable right now"}</h2><p>${escapeHtml(currentState.error)}</p><button class="button button--small" data-action="refresh-catalog" type="button">Try again</button></div></div>`;
   }
   if (!currentState.tracks.length) {
     return `<div class="empty-state"><div><span class="empty-icon">♫</span><h2>${escapeHtml(source.emptyHeading)}</h2><p>${escapeHtml(source.emptyCopy)}</p><button class="button button--small" data-action="${source.quickAction}" type="button">${escapeHtml(source.quickLabel)}</button></div></div>`;
   }
   const needsRefresh = currentState.query !== typedQuery;
   const supportNote = mode === "hindi" ? " Some recordings use OGG or Opus, which depends on your phone browser support." : "";
-  return `<section class="section"><div class="section-header"><h2 class="section-title">${escapeHtml(source.title)}</h2><span class="text-link">${currentState.tracks.length} streams</span></div><p class="catalog-note">${escapeHtml(source.note)} <a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.name)}</a>. Creator and license details stay with every result.${supportNote}</p>${needsRefresh ? `<p class="catalog-refresh">Tap search to update these results.</p>` : ""}${songRows(currentState.tracks, { queue: currentState.tracks.map((track) => track.id) })}</section>`;
+  const resultLabel = mode === "radio" ? "stations" : "streams";
+  const attribution = mode === "radio"
+    ? " Stations provide their own broadcasts; availability and rights are managed by each broadcaster. This is live radio, not an on-demand song catalog."
+    : " Creator and license details stay with every result.";
+  return `<section class="section"><div class="section-header"><h2 class="section-title">${escapeHtml(source.title)}</h2><span class="text-link">${currentState.tracks.length} ${resultLabel}</span></div><p class="catalog-note">${escapeHtml(source.note)} <a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.name)}</a>.${attribution}${supportNote}</p>${needsRefresh ? `<p class="catalog-refresh">Tap search to update these results.</p>` : ""}${songRows(currentState.tracks, { queue: currentState.tracks.map((track) => track.id) })}</section>`;
 }
 
 function cleanCatalogQuery(value) {
@@ -639,6 +663,115 @@ async function searchHindiCatalog(query) {
     if (error?.name === "AbortError" || requestId !== catalogRequestId) return;
     console.error(error);
     catalogState = { status: "error", query: normalizedQuery, tracks: [], error: "Check your connection, then try the Hindi catalog again.", mode: "hindi" };
+  } finally {
+    if (requestId === catalogRequestId) {
+      catalogRequestController = null;
+      renderSearchResults();
+    }
+  }
+}
+
+function safeHttpsUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    return url.protocol === "https:" ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
+function radioStationToTrack(station) {
+  const streamUrl = safeHttpsUrl(station?.url_resolved);
+  const codec = plainText(station?.codec || "").toUpperCase();
+  const isCheckedOnline = station?.lastcheckok === true || Number(station?.lastcheckok) === 1;
+  if (!streamUrl || !isCheckedOnline || Number(station?.ssl_error || 0) !== 0 || Number(station?.hls || 0) !== 0 || !/^(MP3|AAC\+?|M4A)$/.test(codec)) return null;
+
+  const name = plainText(station?.name || "");
+  if (!name) return null;
+  const stationId = String(station?.stationuuid || `${name}-${streamUrl}`);
+  const location = [station?.country, station?.state, station?.language]
+    .map((value) => plainText(value))
+    .filter(Boolean)
+    .filter((value, index, values) => values.indexOf(value) === index)
+    .join(" · ");
+  const tags = plainText(station?.tags || "");
+  const homepage = safeHttpsUrl(station?.homepage) || RADIO_BROWSER_SITE_URL;
+  const id = `radio-${hashValue(stationId)}`;
+  return {
+    id,
+    title: name,
+    artist: location || "Live Hindi radio",
+    album: tags ? `Live radio · ${tags}` : "Live Hindi radio",
+    duration: 0,
+    color: hashValue(`radio-${stationId}`),
+    streamUrl,
+    sourcePage: homepage,
+    sourceName: "Radio Browser",
+    licenseLabel: "Live radio",
+    licenseUrl: homepage,
+    isLive: true,
+    popularity: Number(station?.clickcount || station?.votes || 0),
+    radioSearch: [name, location, tags, station?.country, station?.state, station?.language, codec].join(" ").toLocaleLowerCase()
+  };
+}
+
+function radioSearchTerms(query) {
+  return String(query || "")
+    .trim()
+    .toLocaleLowerCase()
+    .split(/\s+/)
+    .filter((term) => term && !["hindi", "bollywood", "india", "indian", "radio", "live", "music"].includes(term));
+}
+
+function filterHindiRadioStations(stations, query) {
+  const terms = radioSearchTerms(query);
+  if (!terms.length) return stations;
+  return stations.filter((station) => terms.every((term) => station.radioSearch.includes(term)));
+}
+
+async function fetchHindiRadioTag(tag, signal) {
+  const params = new URLSearchParams({
+    tag,
+    hidebroken: "true",
+    limit: "50",
+    order: "clickcount",
+    reverse: "true"
+  });
+  const response = await fetch(`${RADIO_BROWSER_API_URL}/stations/search?${params.toString()}`, { signal });
+  if (!response.ok) throw new Error("Radio Browser did not respond.");
+  const stations = await response.json();
+  if (!Array.isArray(stations)) throw new Error("Radio Browser returned an unexpected response.");
+  return stations.map(radioStationToTrack).filter(Boolean);
+}
+
+async function searchHindiRadio(query, { refresh = false } = {}) {
+  const normalizedQuery = String(query || "").trim();
+  catalogRequestController?.abort();
+  const requestId = ++catalogRequestId;
+  const controller = new AbortController();
+  catalogRequestController = controller;
+  const previousTracks = catalogState.mode === "radio" ? catalogState.tracks : [];
+  catalogState = { status: "loading", query: normalizedQuery, tracks: previousTracks, error: "", mode: "radio" };
+  renderSearchResults();
+
+  try {
+    if (!hindiRadioStations || refresh) {
+      const batches = await Promise.allSettled(HINDI_RADIO_TAGS.map((tag) => fetchHindiRadioTag(tag, controller.signal)));
+      if (requestId !== catalogRequestId) return;
+      const stations = batches
+        .filter((batch) => batch.status === "fulfilled")
+        .flatMap((batch) => batch.value);
+      if (!stations.length) throw new Error("No available Hindi radio stations were returned.");
+      hindiRadioStations = [...new Map(stations.map((station) => [station.streamUrl, station])).values()]
+        .sort((a, b) => b.popularity - a.popularity || a.title.localeCompare(b.title));
+      hindiRadioStations.forEach((station) => catalogTrackCache.set(station.id, station));
+    }
+    const stations = filterHindiRadioStations(hindiRadioStations, normalizedQuery).slice(0, 32);
+    catalogState = { status: "ready", query: normalizedQuery, tracks: stations, error: "", mode: "radio" };
+  } catch (error) {
+    if (error?.name === "AbortError" || requestId !== catalogRequestId) return;
+    console.error(error);
+    catalogState = { status: "error", query: normalizedQuery, tracks: [], error: "Check your connection, then try the live-radio directory again.", mode: "radio" };
   } finally {
     if (requestId === catalogRequestId) {
       catalogRequestController = null;
@@ -1079,6 +1212,7 @@ function renderNowPlaying() {
   const queue = currentQueue().map(trackById).filter(Boolean);
   const [a, b] = colorFor(track);
   const isCatalogTrack = Boolean(track.streamUrl);
+  const isLiveStation = Boolean(track.isLive);
   const sourceName = track.sourceName || "Internet Archive";
   const topAction = isCatalogTrack
     ? `<a class="icon-button" href="${escapeHtml(track.sourcePage)}" target="_blank" rel="noreferrer" aria-label="View source on ${escapeHtml(sourceName)}">${externalIcon()}</a>`
@@ -1089,6 +1223,10 @@ function renderNowPlaying() {
   const favoriteControl = isCatalogTrack
     ? ""
     : `<button class="icon-button heart-button ${track.loved ? "is-loved" : ""}" data-action="toggle-like" data-id="${track.id}" type="button" aria-label="${track.loved ? "Remove from favorites" : "Add to favorites"}">${heartIcon(track.loved)}</button>`;
+  const timingControls = isLiveStation
+    ? `<div class="time-row"><span>Live broadcast</span><span>Station stream</span></div>`
+    : `<input id="now-scrubber" class="scrubber" type="range" min="0" max="100" value="0" step="0.1" aria-label="Song position" />
+      <div class="time-row"><span id="now-current-time">0:00</span><span id="now-duration">${durationText(audio.duration || track.duration)}</span></div>`;
   nowPlayingContent.innerHTML = `<div class="now-top">
     <button class="icon-button" data-action="close-now-playing" type="button" aria-label="Close now playing"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></button>
     <p>Now playing</p>
@@ -1099,8 +1237,7 @@ function renderNowPlaying() {
     <div><h1 id="now-playing-title">${escapeHtml(track.title)}</h1><p>${escapeHtml(track.artist || "Your music")}</p>${sourceDetails}</div>
     ${favoriteControl}
   </div>
-  <input id="now-scrubber" class="scrubber" type="range" min="0" max="100" value="0" step="0.1" aria-label="Song position" />
-  <div class="time-row"><span id="now-current-time">0:00</span><span id="now-duration">${durationText(audio.duration || track.duration)}</span></div>
+  ${timingControls}
   <div class="transport" aria-label="Playback controls">
     <button class="icon-button ${player.shuffle ? "is-on" : ""}" data-action="toggle-shuffle" type="button" aria-label="${player.shuffle ? "Turn shuffle off" : "Turn shuffle on"}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l10 10h3M17 7h3M4 17h3l3-3M14 10l3-3" /></svg></button>
     <button class="icon-button" data-action="previous-track" type="button" aria-label="Previous track"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 5v14l-9-7zM5 5v14" /></svg></button>
@@ -1203,6 +1340,7 @@ async function handleAction(action, button) {
       $("#search-input")?.focus();
       if (appState.searchType === "catalog") await searchOpenCatalog(appState.searchQuery || "");
       if (appState.searchType === "hindi") await searchHindiCatalog(appState.searchQuery || "");
+      if (appState.searchType === "radio") await searchHindiRadio(appState.searchQuery || "");
       break;
     case "open-catalog":
       appState.searchType = "catalog";
@@ -1226,9 +1364,21 @@ async function handleAction(action, button) {
       $("#search-input")?.focus();
       await searchHindiCatalog(appState.searchQuery || "");
       break;
+    case "open-live-radio":
+      appState.searchType = "radio";
+      appState.searchQuery = "";
+      window.location.hash = "search";
+      render();
+      $("#search-input")?.focus();
+      await searchHindiRadio("");
+      break;
     case "refresh-catalog":
       if (appState.searchType === "hindi") await searchHindiCatalog(appState.searchQuery || catalogState.query || "");
+      else if (appState.searchType === "radio") await searchHindiRadio(appState.searchQuery || catalogState.query || "", { refresh: true });
       else await searchOpenCatalog(appState.searchQuery || catalogState.query || "");
+      break;
+    case "refresh-radio":
+      await searchHindiRadio(appState.searchQuery || catalogState.query || "", { refresh: true });
       break;
     case "set-library-filter":
       appState.libraryFilter = button.dataset.filter;
@@ -1310,6 +1460,8 @@ document.addEventListener("submit", async (event) => {
     await searchOpenCatalog(appState.searchQuery || "");
   } else if (appState.searchType === "hindi") {
     await searchHindiCatalog(appState.searchQuery || "");
+  } else if (appState.searchType === "radio") {
+    await searchHindiRadio(appState.searchQuery || "");
   } else {
     renderSearchResults();
   }
