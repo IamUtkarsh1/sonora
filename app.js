@@ -14,7 +14,7 @@ const HINDI_COMMONS_CATEGORIES = [
   { title: "Category:Audio files of Hindustani music", label: "Hindustani music" },
   { title: "Category:Songs of India", label: "Songs of India" }
 ];
-const HINDI_RADIO_TAGS = ["bollywood", "hindi", "indian"];
+const HINDI_RADIO_TAGS = ["bollywood", "hindi"];
 const COLORS = [
   ["#7967e9", "#f3a26e"],
   ["#4e88cb", "#8be0c1"],
@@ -688,15 +688,19 @@ function radioStationToTrack(station) {
 
   const name = plainText(station?.name || "");
   if (!name) return null;
-  const hindiOrBollywood = [name, station?.tags, station?.language].join(" ").toLocaleLowerCase();
-  if (!/(hindi|bollywood|desi)/.test(hindiOrBollywood)) return null;
+  const nameText = name.toLocaleLowerCase();
+  const tags = plainText(station?.tags || "").toLocaleLowerCase();
+  const language = plainText(station?.language || "").toLocaleLowerCase();
+  const relevantLabel = /\b(hindi|bollywood|desi|hindustani)\b/.test(`${nameText} ${tags}`);
+  const compatibleLanguage = !language || /\b(hindi|urdu|hindustani)\b/.test(language);
+  const explicitlyRelevantName = /\b(hindi|bollywood|desi|hindustani)\b/.test(nameText);
+  if (!relevantLabel || (!compatibleLanguage && !explicitlyRelevantName)) return null;
   const stationId = String(station?.stationuuid || `${name}-${streamUrl}`);
   const location = [station?.country, station?.state, station?.language]
     .map((value) => plainText(value))
     .filter(Boolean)
     .filter((value, index, values) => values.indexOf(value) === index)
     .join(" · ");
-  const tags = plainText(station?.tags || "");
   const homepage = safeHttpsUrl(station?.homepage) || RADIO_BROWSER_SITE_URL;
   const id = `radio-${hashValue(stationId)}`;
   return {
@@ -734,6 +738,7 @@ function filterHindiRadioStations(stations, query) {
 async function fetchHindiRadioTag(tag, signal) {
   const params = new URLSearchParams({
     tag,
+    tagExact: "true",
     hidebroken: "true",
     limit: "50",
     order: "clickcount",
