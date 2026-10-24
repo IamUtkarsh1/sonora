@@ -247,7 +247,7 @@ function songRows(tracks, options = {}) {
       <button class="song-copy" data-action="play-track" data-id="${track.id}" data-queue="${queueAttribute}" type="button">
         <span class="song-title">${escapeHtml(track.title)}</span>
         <span class="song-artist">${secondary}</span>
-        ${isCatalogTrack ? `<span class="song-source">Internet Archive · streaming online</span>` : ""}
+        ${isCatalogTrack ? `<span class="song-source">Internet Archive Netlabels · streaming online</span>` : ""}
       </button>
       ${actions}
     </article>`;
@@ -295,7 +295,7 @@ function homeMarkup() {
     </section>` : `<section class="section">
       <div class="empty-state"><div><span class="empty-icon">♫</span><h2>Your music will appear here</h2><p>Choose audio files from your phone or computer. They are stored in this browser, so you can keep listening offline.</p><button class="button" data-action="open-import" type="button">${addIcon()} Import your first song</button></div></div>
     </section>`}
-    <section class="section catalog-callout"><div><p class="eyebrow">Listen online</p><h2 class="section-title">Explore free, open music</h2><p>Search Creative Commons and public-domain audio from Internet Archive, then stream it without adding files to your phone.</p></div><button class="button button--small" data-action="open-catalog" type="button">Open catalog</button></section>
+    <section class="section catalog-callout"><div><p class="eyebrow">Listen online</p><h2 class="section-title">Explore free, open music</h2><p>Search Creative Commons and public-domain audio from Internet Archive Netlabels, then stream it without adding files to your phone.</p></div><button class="button button--small" data-action="open-catalog" type="button">Open catalog</button></section>
   </section>`;
 }
 
@@ -349,10 +349,10 @@ function catalogResultsMarkup() {
     return `<div class="empty-state"><div><span class="empty-icon">!</span><h2>Catalog unavailable right now</h2><p>${escapeHtml(catalogState.error)}</p><button class="button button--small" data-action="refresh-catalog" type="button">Try again</button></div></div>`;
   }
   if (!catalogState.tracks.length) {
-    return `<div class="empty-state"><div><span class="empty-icon">♫</span><h2>Free music, ready to stream</h2><p>Search openly licensed Creative Commons and public-domain music from Internet Archive. Nothing is copied into your library unless you add your own file.</p><button class="button button--small" data-action="catalog-quick-query" data-query="ambient" type="button">Try ambient music</button></div></div>`;
+    return `<div class="empty-state"><div><span class="empty-icon">♫</span><h2>Free music, ready to stream</h2><p>Search openly licensed Creative Commons and public-domain music from Internet Archive Netlabels. Nothing is copied into your library unless you add your own file.</p><button class="button button--small" data-action="catalog-quick-query" data-query="ambient" type="button">Try ambient music</button></div></div>`;
   }
   const needsRefresh = catalogState.query !== typedQuery;
-  return `<section class="section"><div class="section-header"><h2 class="section-title">Open catalog</h2><span class="text-link">${catalogState.tracks.length} streams</span></div><p class="catalog-note">Streaming Creative Commons/public-domain audio from <a href="https://archive.org/" target="_blank" rel="noreferrer">Internet Archive</a>. Creator and license details stay with every result.</p>${needsRefresh ? `<p class="catalog-refresh">Tap search to update these results.</p>` : ""}${songRows(catalogState.tracks, { queue: catalogState.tracks.map((track) => track.id) })}</section>`;
+  return `<section class="section"><div class="section-header"><h2 class="section-title">Open catalog</h2><span class="text-link">${catalogState.tracks.length} streams</span></div><p class="catalog-note">Streaming Creative Commons/public-domain audio from <a href="https://archive.org/" target="_blank" rel="noreferrer">Internet Archive Netlabels</a>. Creator and license details stay with every result.</p>${needsRefresh ? `<p class="catalog-refresh">Tap search to update these results.</p>` : ""}${songRows(catalogState.tracks, { queue: catalogState.tracks.map((track) => track.id) })}</section>`;
 }
 
 function cleanCatalogQuery(value) {
@@ -367,8 +367,7 @@ function cleanCatalogQuery(value) {
 function archiveCatalogQuery(query) {
   const clauses = [
     "mediatype:audio",
-    "collection:opensource_audio",
-    "subject:music",
+    "collection:netlabels",
     "(licenseurl:*creativecommons.org* OR licenseurl:*publicdomain*)",
     'format:"VBR MP3"'
   ];
